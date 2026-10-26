@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0018",
+  "tier": 2,
+  "word": "LEMON",
+  "display": "lemon",
+  "meaning_id": "lemon",
+  "category": "food",
+  "mechanic": "letter_drag",
+  "image": "food/lemon",
+  "audio_word": "words/lemon",
+  "audio_phonemes": ["phonemes/l", "phonemes/e", "phonemes/m", "phonemes/o", "phonemes/n"],
+  "tiles": ["L", "E", "M", "O", "N"],
+  "distractors": ["A", "R"],
+  "chunks": null,
+  "hint": "A yellow fruit. It tastes sour.",
+  "ghost_letters": false
+}

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../game/audio';
-import { allLevels, levelById } from '../game/levels';
+import { manifestCount, manifestEntryById, preloadLevel } from '../game/levels';
 import { wordbook, type WordbookEntry } from '../game/wordbook';
 import {
   ATLAS_KEY,
@@ -86,7 +86,7 @@ export class WordbookScene extends Phaser.Scene {
 
     makeText(this, DESIGN_WIDTH / 2, 78, 'My Wordbook', 52, '#21324a', true);
 
-    const total = allLevels().length;
+    const total = manifestCount();
     const unlocked = this.entries.length;
     makeText(this, DESIGN_WIDTH / 2, 130, `${unlocked} of ${total} words collected`, 26, '#54708c');
 
@@ -157,9 +157,10 @@ export class WordbookScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    const level = levelById(entry.levelId);
+    // Manifest only: the card's tier/category metadata must not download a puzzle.
+    const manifestEntry = manifestEntryById(entry.levelId);
     const meta = this.add
-      .text(0, 22, `Tier ${entry.tier}${level ? ` · ${level.category}` : ''}`, {
+      .text(0, 22, `Tier ${entry.tier}${manifestEntry ? ` · ${manifestEntry.category}` : ''}`, {
         fontFamily: '"Trebuchet MS", "Segoe UI", Verdana, sans-serif',
         fontSize: '19px',
         color: '#7f95ab',
@@ -180,6 +181,9 @@ export class WordbookScene extends Phaser.Scene {
     );
     card.on(Phaser.Input.Events.POINTER_DOWN, () => {
       this.tweens.add({ targets: card, scale: 0.96, duration: 80, yoyo: true });
+      // Warm this word's puzzle chunk as soon as the kid shows interest, so a
+      // replay of the level starts instantly without blocking the card tap.
+      if (manifestEntry) void preloadLevel(manifestEntry.id);
     });
     card.on(Phaser.Input.Events.POINTER_UP, () => {
       // Replay the word audio (phonics contract: whole word here, not phonemes).

@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0006",
+  "tier": 1,
+  "word": "CUP",
+  "display": "cup",
+  "meaning_id": "cangkir",
+  "category": "home",
+  "mechanic": "letter_drag",
+  "image": "home/cup",
+  "audio_word": "words/cup",
+  "audio_phonemes": ["phonemes/k", "phonemes/u", "phonemes/p"],
+  "tiles": ["C", "U", "P"],
+  "distractors": [],
+  "chunks": null,
+  "hint": "You drink from it.",
+  "ghost_letters": true
+}

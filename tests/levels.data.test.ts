@@ -1,21 +1,90 @@
-import { describe, expect, it } from 'vitest';
-import rawLevels from '../src/data/levels.json';
-import { parseLevelPack } from '../src/game/levelLoader';
+import { beforeAll, describe, expect, it } from 'vitest';
+import {
+  loadLevel,
+  levelManifest,
+  manifestEntriesByTier,
+  manifestEntryById,
+  manifestIndexOf,
+  manifestCount,
+  nextLevelManifest,
+} from '../src/game/levels';
 import { buildTray, isPuzzleComplete, resolveDrop, targetUnits } from '../src/game/puzzle';
-import { levelPack } from '../src/game/levels';
+import type { Level } from '../src/game/levelTypes';
 
-const pack = parseLevelPack(rawLevels);
-const levels = pack.levels;
+/**
+ * Seed-data suite for the MODULAR level layout (src/data/levels/).
+ *
+ * Every level is its own lazily-imported file, so this suite is async: it pulls
+ * all 30 chunks through the public loader and then asserts the same seed-data
+ * contract the monolithic pack used to guarantee. Anything that used to be
+ * "the pack parses" is now "every individual file loads and validates".
+ */
 
-describe('seeded level data (docs/SPEC.md v1 scope)', () => {
-  it('parses cleanly', () => {
-    expect(levels.length).toBe(30);
+const COUNT = 30;
+
+let levels: Level[];
+
+beforeAll(async () => {
+  const ids = levelManifest().levels.map((entry) => entry.id);
+  const loaded = await Promise.all(ids.map((id) => loadLevel(id)));
+  // File order is manifest order, so tier/index lookups stay predictable.
+  levels = loaded;
+});
+
+describe('level manifest (src/data/levels/manifest.json)', () => {
+  it('lists exactly 30 levels', () => {
+    expect(manifestCount()).toBe(COUNT);
+    expect(levelManifest().version).toBe(2);
   });
 
   it('ships exactly 10 / 8 / 6 / 3 / 3 levels by tier', () => {
-    const byTier = new Map<number, number>();
-    for (const level of levels) byTier.set(level.tier, (byTier.get(level.tier) ?? 0) + 1);
-    expect(Object.fromEntries(byTier)).toEqual({ 1: 10, 2: 8, 3: 6, 4: 3, 5: 3 });
+    const counts = [...manifestEntriesByTier().entries()]
+      .map(([tier, entries]) => [tier, entries.length] as const)
+      .sort((a, b) => a[0] - b[0]);
+    expect(Object.fromEntries(counts)).toEqual({ 1: 10, 2: 8, 3: 6, 4: 3, 5: 3 });
+  });
+
+  it('uses unique ids and unique words', () => {
+    const entries = levelManifest().levels;
+    expect(new Set(entries.map((e) => e.id)).size).toBe(entries.length);
+    expect(new Set(entries.map((e) => e.word)).size).toBe(entries.length);
+  });
+
+  it('points at the documented per-tier file layout', () => {
+    for (const entry of levelManifest().levels) {
+      expect(entry.file, entry.id).toMatch(/^tier-[1-5]\/lvl_\d{4}_[a-z]+\.json$/);
+      expect(entry.file.startsWith(`tier-${entry.tier}/`), entry.id).toBe(true);
+    }
+  });
+
+  it('exposes manifest lookups used by the scenes', () => {
+    const first = manifestEntryById('lvl_0001');
+    expect(first?.word).toBe('CAT');
+    expect(manifestIndexOf('lvl_0001')).toBe(0);
+    expect(manifestIndexOf('nope')).toBe(-1);
+    expect(nextLevelManifest('lvl_0001')?.id).toBe('lvl_0002');
+    expect(nextLevelManifest('not-a-level')).toBeNull();
+    expect(nextLevelManifest(levelManifest().levels[COUNT - 1]!.id)).toBeNull();
+  });
+});
+
+describe('every level file loads and validates', () => {
+  it('loads all 30 levels through the lazy loader', () => {
+    expect(levels).toHaveLength(COUNT);
+    expect(levels.map((l) => l.id)).toEqual(levelManifest().levels.map((e) => e.id));
+  });
+
+  it('keeps the manifest row and the level file in agreement', () => {
+    for (const entry of levelManifest().levels) {
+      const level = levels[manifestIndexOf(entry.id)];
+      expect(level, entry.id).toBeDefined();
+      expect(level!.id, entry.id).toBe(entry.id);
+      expect(level!.tier, entry.id).toBe(entry.tier);
+      expect(level!.word, entry.id).toBe(entry.word);
+      expect(level!.display, entry.id).toBe(entry.display);
+      expect(level!.mechanic, entry.id).toBe(entry.mechanic);
+      expect(level!.category, entry.id).toBe(entry.category);
+    }
   });
 
   it('covers all 5 tiers and all 4 mechanics', () => {
@@ -23,11 +92,6 @@ describe('seeded level data (docs/SPEC.md v1 scope)', () => {
     const mechanics = new Set(levels.map((l) => l.mechanic));
     expect([...tiers].sort()).toEqual([1, 2, 3, 4, 5]);
     expect([...mechanics].sort()).toEqual(['affix', 'compound', 'letter_drag', 'syllable_tap']);
-  });
-
-  it('uses unique ids and unique words', () => {
-    expect(new Set(levels.map((l) => l.id)).size).toBe(levels.length);
-    expect(new Set(levels.map((l) => l.word)).size).toBe(levels.length);
   });
 
   it('maps each tier to its spec mechanic', () => {
@@ -214,12 +278,5 @@ describe('edge cases in the tray', () => {
   it('at least one level has duplicate tiles (APPLE/BANANA style)', () => {
     const duplicates = levels.filter((level) => new Set(level.tiles).size !== level.tiles.length);
     expect(duplicates.length).toBeGreaterThan(0);
-  });
-});
-
-describe('levelPack() singleton', () => {
-  it('returns the same validated pack', () => {
-    expect(levelPack().levels.length).toBe(30);
-    expect(levelPack()).toBe(levelPack());
   });
 });

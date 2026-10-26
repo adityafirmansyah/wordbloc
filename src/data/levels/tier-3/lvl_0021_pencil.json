@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0021",
+  "tier": 3,
+  "word": "PENCIL",
+  "display": "pencil",
+  "meaning_id": "pensil",
+  "category": "school",
+  "mechanic": "syllable_tap",
+  "image": "school/pencil",
+  "audio_word": "words/pencil",
+  "audio_phonemes": ["phonemes/pen", "phonemes/cil"],
+  "tiles": ["PEN", "CIL"],
+  "distractors": ["PIN", "PENS"],
+  "chunks": ["PEN", "CIL"],
+  "hint": "You write with it and rub it out.",
+  "ghost_letters": false
+}

@@ -1,6 +1,14 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../game/audio';
-import { levelById, indexOfLevel, levelAt } from '../game/levels';
+import {
+  levelManifest,
+  loadLevel,
+  manifestCount,
+  manifestEntryById,
+  manifestIndexOf,
+  nextLevelManifest,
+  preloadLevel,
+} from '../game/levels';
 import {
   buildTray,
   isPuzzleComplete,
@@ -73,6 +81,12 @@ export class GameScene extends Phaser.Scene {
   private level!: Level;
   private audio!: AudioManager;
 
+  /** Level id requested by the previous scene; resolved asynchronously in create(). */
+  private requestedLevelId = 'lvl_0001';
+  /** Bumped per load so a superseded/short-circuited load cannot draw. */
+  private loadToken = 0;
+  private board: Phaser.GameObjects.Container | null = null;
+
   private slots: SlotView[] = [];
   private tiles: TileView[] = [];
   private filled: (string | null)[] = [];
@@ -89,12 +103,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   init(data: GameSceneData): void {
-    const requested = data.levelId ?? 'lvl_0001';
-    const resolved = levelById(requested) ?? levelAt(0);
-    if (!resolved) {
-      throw new Error(`WordBloc GameScene: level "${requested}" is not in the pack.`);
-    }
-    this.level = resolved;
+    // No level data is touched here: init() is synchronous and the puzzle file is
+    // a lazily-imported chunk, so the id is only recorded and resolved in create().
+    this.requestedLevelId = data.levelId ?? 'lvl_0001';
   }
 
   create(): void {
@@ -107,9 +118,105 @@ export class GameScene extends Phaser.Scene {
     this.dragging = null;
     this.solved = false;
     this.wrongDrops = 0;
-    this.filled = targetUnits(this.level).map(() => null);
+    this.board = null;
 
-    this.registry.set('currentLevelId', this.level.id);
+    // Unknown ids fall back to the first manifest entry, exactly as before, but
+    // without needing any level file in memory to decide.
+    const entry = manifestEntryById(this.requestedLevelId) ?? levelManifest().levels[0];
+    if (!entry) {
+      throw new Error('WordBloc GameScene: the level manifest is empty.');
+    }
+    this.registry.set('currentLevelId', entry.id);
+
+    this.drawLoading(entry.display);
+    void this.loadRequestedLevel(entry.id);
+  }
+
+  /**
+   * Pulls the puzzle chunk and draws the board when it arrives.
+   *
+   * The scene stays responsive while the chunk loads (a short "Loading <word>"
+   * card covers the stage), and a load that resolves after the player has already
+   * navigated away is discarded via the token check.
+   */
+  private async loadRequestedLevel(id: string): Promise<void> {
+    const token = (this.loadToken += 1);
+    let level: Level;
+    try {
+      level = await loadLevel(id);
+    } catch (error) {
+      if (token !== this.loadToken || !this.scene.isActive()) return;
+      this.showLoadFailure(error);
+      return;
+    }
+    if (token !== this.loadToken || !this.scene.isActive()) return;
+
+    this.level = level;
+    this.clearLoading();
+    this.drawBoard();
+
+    // Warm the next level while this one is being played, so "Next" is instant.
+    const upcoming = nextLevelManifest(id);
+    if (upcoming) void preloadLevel(upcoming.id);
+  }
+
+  private showLoadFailure(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('WordBloc: level failed to load.', error);
+    makeText(
+      this,
+      DESIGN_WIDTH / 2,
+      BANDS.slotsCenterY,
+      'Could not load this level.',
+      34,
+      '#c24848',
+      true,
+    );
+    makeText(this, DESIGN_WIDTH / 2, BANDS.hintY, message, 22, '#54708c');
+    makeIconButton(this, {
+      x: DESIGN_WIDTH / 2,
+      y: BANDS.trayCenterY,
+      frame: FRAMES.home,
+      size: 132,
+      onClick: () => this.scene.start(SCENES.menu),
+    });
+  }
+
+  // -------------------------------------------------------------- loading card
+
+  private drawLoading(display: string): void {
+    this.board = this.add.container(0, 0);
+    const strip = this.add.image(DESIGN_WIDTH / 2, 360, ATLAS_KEY, FRAMES.bgStrip);
+    strip.setDisplaySize(DESIGN_WIDTH, 720);
+    strip.setDepth(-100);
+    this.board.add(strip);
+
+    const card = this.add.image(DESIGN_WIDTH / 2, 360, ATLAS_KEY, FRAMES.panel);
+    card.setDisplaySize(520, 180);
+    this.board.add(card);
+    this.board.add(makeText(this, DESIGN_WIDTH / 2, 332, 'Loading…', 40, '#21324a', true));
+    this.board.add(makeText(this, DESIGN_WIDTH / 2, 386, display, 30, '#7f95ab'));
+
+    // Escape hatch while the chunk is in flight: without it a stalled download
+    // would trap the player on a card with no controls at all.
+    const home = makeIconButton(this, {
+      x: 92,
+      y: BANDS.headerCenterY,
+      frame: FRAMES.home,
+      size: 132,
+      onClick: () => this.scene.start(SCENES.menu),
+    });
+    home.setDepth(20);
+    this.board.add(home);
+  }
+
+  private clearLoading(): void {
+    this.board?.destroy(true);
+    this.board = null;
+  }
+
+  private drawBoard(): void {
+    this.filled = targetUnits(this.level).map(() => null);
 
     this.drawBackground();
     this.drawHeader();
@@ -164,7 +271,7 @@ export class GameScene extends Phaser.Scene {
       this,
       DESIGN_WIDTH / 2,
       BANDS.headerCenterY + 26,
-      `Level ${indexOfLevel(this.level.id) + 1} of ${this.registry.get('levelCount') ?? 30}`,
+      `Level ${manifestIndexOf(this.level.id) + 1} of ${this.registry.get('levelCount') ?? manifestCount()}`,
       24,
       '#7f95ab',
     );

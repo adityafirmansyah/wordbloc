@@ -1,11 +1,14 @@
 import Phaser from 'phaser';
 import { buildUiAtlas } from '../game/uiAtlas';
-import { allLevels } from '../game/levels';
+import { assertLevelData, manifestCount } from '../game/levels';
 import { SCENES } from '../game/theme';
 
 /**
- * Boot: builds the procedural UI atlas (ONE texture, all frames), pre-warms
- * the level pack, then hands off to Menu. No external image is ever loaded.
+ * Boot: builds the procedural UI atlas (ONE texture, all frames), validates the
+ * level manifest, then hands off to Menu. No external image is ever loaded.
+ *
+ * Level PUZZLES are NOT loaded here — each one is its own lazily-imported chunk.
+ * Boot only proves the manifest is valid and that every row has a file behind it.
  */
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -20,9 +23,9 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     buildUiAtlas(this);
 
-    // Validate + warm the level pack before any scene needs it.
-    const levels = allLevels();
-    this.registry.set('levelCount', levels.length);
+    // Manifest validity + file coverage, without pulling any puzzle down.
+    assertLevelData();
+    this.registry.set('levelCount', manifestCount());
 
     this.scene.start(SCENES.menu);
   }

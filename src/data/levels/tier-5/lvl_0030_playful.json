@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0030",
+  "tier": 5,
+  "word": "PLAYFUL",
+  "display": "playful",
+  "meaning_id": "suka bermain",
+  "category": "feelings",
+  "mechanic": "affix",
+  "image": "feelings/playful",
+  "audio_word": "words/playful",
+  "audio_phonemes": ["phonemes/play", "phonemes/ful"],
+  "tiles": ["PLAY", "FUL"],
+  "distractors": ["FULLY", "PLAYER"],
+  "chunks": ["PLAY", "FUL"],
+  "hint": "Riddle: full of play. Put a suffix after PLAY.",
+  "ghost_letters": false
+}

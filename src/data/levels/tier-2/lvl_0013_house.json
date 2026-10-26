@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0013",
+  "tier": 2,
+  "word": "HOUSE",
+  "display": "house",
+  "meaning_id": "rumah",
+  "category": "home",
+  "mechanic": "letter_drag",
+  "image": "home/house",
+  "audio_word": "words/house",
+  "audio_phonemes": ["phonemes/h", "phonemes/ow", "phonemes/ow", "phonemes/s", "phonemes/silent"],
+  "tiles": ["H", "O", "U", "S", "E"],
+  "distractors": ["M", "N"],
+  "chunks": null,
+  "hint": "You live in it.",
+  "ghost_letters": false
+}

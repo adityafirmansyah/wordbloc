@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0011",
+  "tier": 2,
+  "word": "TIGER",
+  "display": "tiger",
+  "meaning_id": "harimau",
+  "category": "animals",
+  "mechanic": "letter_drag",
+  "image": "animals/tiger",
+  "audio_word": "words/tiger",
+  "audio_phonemes": ["phonemes/t", "phonemes/ie", "phonemes/g", "phonemes/er", "phonemes/er"],
+  "tiles": ["T", "I", "G", "E", "R"],
+  "distractors": ["L", "M"],
+  "chunks": null,
+  "hint": "A big cat with stripes.",
+  "ghost_letters": false
+}

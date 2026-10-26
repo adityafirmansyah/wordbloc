@@ -1,10 +1,12 @@
 import { SILENT_PHONEME } from './audio';
 import {
   LevelContractError,
+  MANIFEST_VERSION,
   MECHANICS,
   TIERS,
   type Level,
-  type LevelPack,
+  type LevelManifest,
+  type LevelManifestEntry,
   type Mechanic,
   type Tier,
 } from './levelTypes';
@@ -169,26 +171,109 @@ export function parseLevel(raw: unknown, index: number): Level {
   };
 }
 
-/** Validates the whole pack. Throws on the first contract violation. */
-export function parseLevelPack(raw: unknown): LevelPack {
+/**
+ * Validates one manifest row. The manifest is hand-editable data that drives
+ * every lookup, so a typo must fail loudly at boot rather than silently hiding
+ * a level from the menu.
+ */
+function parseManifestEntry(raw: unknown, index: number): LevelManifestEntry {
   if (!isRecord(raw)) {
-    throw new LevelContractError('Level pack root is not an object.');
-  }
-  if (typeof raw.version !== 'number') {
-    throw new LevelContractError('Level pack is missing numeric "version".', null, 'version');
-  }
-  if (!Array.isArray(raw.levels) || raw.levels.length === 0) {
-    throw new LevelContractError('Level pack is missing non-empty "levels" array.', null, 'levels');
+    throw new LevelContractError(`Manifest entry at index ${index} is not an object.`);
   }
 
-  const seen = new Set<string>();
+  const id = typeof raw.id === 'string' && raw.id.length > 0 ? raw.id : `#${index}`;
+
+  if (!isTier(raw.tier)) {
+    throw new LevelContractError(
+      `Manifest entry "${id}" has invalid tier ${JSON.stringify(raw.tier)}. Expected 1-5.`,
+      id,
+      'tier',
+    );
+  }
+  if (!isMechanic(raw.mechanic)) {
+    throw new LevelContractError(
+      `Manifest entry "${id}" has unknown mechanic ${JSON.stringify(raw.mechanic)}. ` +
+        `Expected one of: ${MECHANICS.join(', ')}.`,
+      id,
+      'mechanic',
+    );
+  }
+
+  const file = requireString(raw, 'file', id);
+  // Path safety: the loader maps this string onto a bundled module key, so only
+  // the documented `tier-N/<name>.json` shape is allowed (no traversal, no URLs).
+  if (!/^tier-[1-5]\/[A-Za-z0-9_.-]+\.json$/.test(file)) {
+    throw new LevelContractError(
+      `Manifest entry "${id}" has invalid "file" ${JSON.stringify(file)}. ` +
+        'Expected "tier-N/<name>.json".',
+      id,
+      'file',
+    );
+  }
+  if (!file.startsWith(`tier-${raw.tier}/`)) {
+    throw new LevelContractError(
+      `Manifest entry "${id}" declares tier ${raw.tier} but its file lives in "${file}".`,
+      id,
+      'file',
+    );
+  }
+
+  return {
+    id,
+    tier: raw.tier,
+    word: requireString(raw, 'word', id),
+    display: requireString(raw, 'display', id),
+    meaning_id: typeof raw.meaning_id === 'string' ? raw.meaning_id : '',
+    category: typeof raw.category === 'string' ? raw.category : 'misc',
+    mechanic: raw.mechanic,
+    file,
+  };
+}
+
+/** Validates `src/data/levels/manifest.json`. Throws on the first violation. */
+export function parseLevelManifest(raw: unknown): LevelManifest {
+  if (!isRecord(raw)) {
+    throw new LevelContractError('Level manifest root is not an object.');
+  }
+  if (typeof raw.version !== 'number') {
+    throw new LevelContractError('Level manifest is missing numeric "version".', null, 'version');
+  }
+  if (raw.version !== MANIFEST_VERSION) {
+    throw new LevelContractError(
+      `Level manifest version ${raw.version} is not supported (expected ${MANIFEST_VERSION}).`,
+      null,
+      'version',
+    );
+  }
+  if (!Array.isArray(raw.levels) || raw.levels.length === 0) {
+    throw new LevelContractError(
+      'Level manifest is missing non-empty "levels" array.',
+      null,
+      'levels',
+    );
+  }
+
+  const seenIds = new Set<string>();
+  const seenFiles = new Set<string>();
   const levels = raw.levels.map((entry, index) => {
-    const level = parseLevel(entry, index);
-    if (seen.has(level.id)) {
-      throw new LevelContractError(`Duplicate level id "${level.id}".`, level.id, 'id');
+    const parsed = parseManifestEntry(entry, index);
+    if (seenIds.has(parsed.id)) {
+      throw new LevelContractError(
+        `Duplicate level id "${parsed.id}" in manifest.`,
+        parsed.id,
+        'id',
+      );
     }
-    seen.add(level.id);
-    return level;
+    if (seenFiles.has(parsed.file)) {
+      throw new LevelContractError(
+        `Manifest entries share the file "${parsed.file}".`,
+        parsed.id,
+        'file',
+      );
+    }
+    seenIds.add(parsed.id);
+    seenFiles.add(parsed.file);
+    return parsed;
   });
 
   return { version: raw.version, levels };

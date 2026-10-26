@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLevel, parseLevelPack } from '../src/game/levelLoader';
+import { parseLevel, parseLevelManifest } from '../src/game/levelLoader';
 import { LevelContractError } from '../src/game/levelTypes';
 
 const validLevel = {
@@ -173,24 +173,94 @@ describe('parseLevel — readable contract violations', () => {
   });
 });
 
-describe('parseLevelPack', () => {
-  it('rejects a missing version', () => {
-    expect(() => parseLevelPack({ levels: [validLevel] })).toThrowError(/version/);
+describe('parseLevelPack — removed with the monolithic pack', () => {
+  // The single-file pack is gone: `manifest.json` + per-level files replace it, so
+  // pack-level parsing has no caller. `parseLevelManifest` (below) covers the
+  // duplicate-id/empty-collection cases the pack parser used to guard.
+  it('is no longer exported', async () => {
+    const loader = await import('../src/game/levelLoader');
+    expect('parseLevelPack' in loader).toBe(false);
+  });
+});
+
+const validManifestEntry = {
+  id: 'lvl_0001',
+  tier: 1,
+  word: 'CAT',
+  display: 'cat',
+  meaning_id: 'kucing',
+  category: 'animals',
+  mechanic: 'letter_drag',
+  file: 'tier-1/lvl_0001_cat.json',
+};
+
+describe('parseLevelManifest — the index the app reads synchronously', () => {
+  it('parses a spec-shaped manifest', () => {
+    const manifest = parseLevelManifest({ version: 2, levels: [validManifestEntry] });
+    expect(manifest.version).toBe(2);
+    expect(manifest.levels[0]).toEqual(validManifestEntry);
   });
 
-  it('rejects an empty levels array', () => {
-    expect(() => parseLevelPack({ version: 1, levels: [] })).toThrowError(/levels/);
-  });
-
-  it('rejects duplicate ids', () => {
-    expect(() => parseLevelPack({ version: 1, levels: [validLevel, validLevel] })).toThrowError(
-      /Duplicate level id/,
+  it('rejects a missing / unsupported version', () => {
+    expect(() => parseLevelManifest({ levels: [validManifestEntry] })).toThrowError(/version/);
+    expect(() => parseLevelManifest({ version: 1, levels: [validManifestEntry] })).toThrowError(
+      /not supported/,
     );
   });
 
-  it('parses a valid pack', () => {
-    const pack = parseLevelPack({ version: 1, levels: [validLevel] });
-    expect(pack.version).toBe(1);
-    expect(pack.levels).toHaveLength(1);
+  it('rejects an empty levels array', () => {
+    expect(() => parseLevelManifest({ version: 2, levels: [] })).toThrowError(/levels/);
+  });
+
+  it('rejects an unknown mechanic and names it', () => {
+    expect(() =>
+      parseLevelManifest({
+        version: 2,
+        levels: [{ ...validManifestEntry, mechanic: 'teleport' }],
+      }),
+    ).toThrowError(/teleport/);
+  });
+
+  it('rejects duplicate ids and duplicate files', () => {
+    expect(() =>
+      parseLevelManifest({ version: 2, levels: [validManifestEntry, validManifestEntry] }),
+    ).toThrowError(/Duplicate level id/);
+    expect(() =>
+      parseLevelManifest({
+        version: 2,
+        levels: [validManifestEntry, { ...validManifestEntry, id: 'lvl_0002' }],
+      }),
+    ).toThrowError(/share the file/);
+  });
+
+  it('rejects a file that escapes the tier directory', () => {
+    for (const file of ['../../etc/passwd', 'tier-1/../../x.json', 'http://evil/x.json']) {
+      expect(() =>
+        parseLevelManifest({ version: 2, levels: [{ ...validManifestEntry, file }] }),
+      ).toThrowError(LevelContractError);
+    }
+  });
+
+  it('rejects a file in a different tier directory than declared', () => {
+    expect(() =>
+      parseLevelManifest({
+        version: 2,
+        levels: [{ ...validManifestEntry, tier: 2, file: 'tier-1/lvl_0001_cat.json' }],
+      }),
+    ).toThrowError(/declares tier 2/);
+  });
+
+  it('names the entry and field on a bad file path', () => {
+    try {
+      parseLevelManifest({
+        version: 2,
+        levels: [{ ...validManifestEntry, file: 'nope.json' }],
+      });
+      expect.fail('should have thrown');
+    } catch (error) {
+      const err = error as LevelContractError;
+      expect(err.levelId).toBe('lvl_0001');
+      expect(err.field).toBe('file');
+    }
   });
 });

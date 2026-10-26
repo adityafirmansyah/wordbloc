@@ -1,19 +1,20 @@
 import Phaser from 'phaser';
 import { createGameConfig } from './game/config';
-import { parseLevelPack } from './game/levelLoader';
+import { assertLevelData } from './game/levels';
 import { gateCurrentViewport } from './ui/viewportGate';
-import rawLevels from './data/levels.json';
 
 /**
- * Boot entry. Level data is validated ONCE here, so a malformed levels.json
- * fails loudly with a readable message instead of surfacing mid-game.
+ * Boot entry. The level MANIFEST is validated here, so a malformed manifest or a
+ * row pointing at a missing file fails loudly with a readable message instead of
+ * surfacing mid-game. Individual level files stay lazy — validating all of them
+ * at boot would defeat the point of splitting them out.
  */
 function start(): void {
   const parent = document.getElementById('game');
   if (!parent) throw new Error('WordBloc: #game container is missing from index.html.');
 
-  // Validate the frozen contract before Phaser boots. Throws LevelContractError.
-  parseLevelPack(rawLevels);
+  // Validate the manifest contract before Phaser boots. Throws LevelContractError.
+  assertLevelData();
 
   const game = new Phaser.Game(createGameConfig(parent));
 

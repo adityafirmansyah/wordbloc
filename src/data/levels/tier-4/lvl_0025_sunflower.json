@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0025",
+  "tier": 4,
+  "word": "SUNFLOWER",
+  "display": "sunflower",
+  "meaning_id": "bunga matahari",
+  "category": "nature",
+  "mechanic": "compound",
+  "image": "nature/sunflower",
+  "audio_word": "words/sunflower",
+  "audio_phonemes": ["phonemes/sun", "phonemes/flower"],
+  "tiles": ["SUN", "FLOWER"],
+  "distractors": ["FLY", "FLOWERS"],
+  "chunks": ["SUN", "FLOWER"],
+  "hint": "Two words join: the sun + a flower.",
+  "ghost_letters": false
+}

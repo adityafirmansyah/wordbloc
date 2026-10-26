@@ -44,11 +44,11 @@ src/
   main.ts                 entry — validates level data, boots Phaser
   game/
     config.ts             Phaser config (AUTO renderer, Scale.FIT 1280x720)
-    levelTypes.ts         frozen level contract types + LevelContractError
-    levelLoader.ts        validating loader (readable throws)
-    levels.ts             validated pack singleton + lookups
+    levelTypes.ts         frozen level + manifest contract types, LevelContractError
+    levelLoader.ts        validating parsers (readable throws)
+    levels.ts             manifest lookups + lazy per-level loading + cache
     puzzle.ts             pure core-loop rules (no Phaser) — unit tested
-    progress.ts           unlock / resume rules
+    progress.ts           unlock / resume rules (manifest only)
     wordbook.ts           localStorage persistence (graceful degradation)
     audio.ts              phonics playback facade (never crashes on a missing key)
     uiAtlas.ts            builds ONE procedural texture atlas at boot
@@ -56,16 +56,29 @@ src/
     rng.ts                seeded PRNG for stable tray shuffles
   scenes/                 Boot -> Menu -> Game -> Reward -> Wordbook
   ui/kit.ts               shared button / text / panel helpers
-  data/levels.json        30 seeded levels
-tests/                    vitest suites (loader, puzzle, data, audio, layout)
+  data/levels/
+    manifest.json         index of all 30 levels (sync, lightweight)
+    tier-1..tier-5/       one JSON per level -> one lazy JS chunk each
+tests/                    vitest suites (loader, catalog, data, puzzle, audio, layout)
 ```
 
 ### Level data
 
-Levels live in `src/data/levels.json` and are validated against the contract in
-`docs/SPEC.md` at boot. An unknown `mechanic`, a missing `tiles`/`chunks` array,
-or a tile set that cannot spell the word throws a `LevelContractError` naming the
-offending level and field.
+Levels are modular: `src/data/levels/manifest.json` is a small synchronous index
+(id, tier, word, display, meaning, category, mechanic, file) and the full puzzle
+for each word lives in its own file under `src/data/levels/tier-N/`. Vite's
+`import.meta.glob` maps every level file to a separate chunk, so `loadLevel(id)`
+downloads exactly one puzzle and caches it; `preloadLevel(id)` warms the next one
+during play. Menu, Progress and Wordbook read the manifest only.
+
+Validation happens in two places: the manifest (plus "does every row have a
+bundled file?") is checked at boot in `main.ts`, and each level file is validated
+against the contract in `docs/SPEC.md` through `parseLevel()` the first time it is
+loaded. An unknown `mechanic`, a missing `tiles`/`chunks` array, a tile set that
+cannot spell the word, or a file that disagrees with its manifest row throws a
+`LevelContractError` naming the offending level and field.
+
+Adding a level is one new file plus one manifest row — nothing else re-downloads.
 
 ### Rendering & assets
 
