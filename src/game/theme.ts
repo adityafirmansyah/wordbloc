@@ -386,7 +386,7 @@ export function wordbookPagerX(stage: StageMetrics): { left: number; right: numb
   return { left: stage.left + WORDBOOK.pagerInset, right: stage.right - WORDBOOK.pagerInset };
 }
 
-/** The Wordbook Back button rect for a live stage (header, hugging the left edge). */
+/** The Wordbook Back button x for a live stage (header, hugging the left edge). */
 export function wordbookBackX(stage: StageMetrics): number {
   return stage.left + WORDBOOK.backInset;
 }
@@ -395,7 +395,7 @@ export function wordbookBackX(stage: StageMetrics): number {
  * Horizontal anchoring rule for an object that follows the live stage.
  * Centred content needs no rule at all (the camera keeps the island centred);
  * this exists for surfaces that hug a stage edge — header buttons, pager arrows,
- * decorations — so they stay inside the frame on any aspect ratio.
+ * Wordbook Back, decorations — so they stay inside the frame on any aspect ratio.
  */
 export type StageAnchor =
   | { readonly kind: 'centre'; readonly dx?: number }
