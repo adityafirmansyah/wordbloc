@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   BANDS,
   BUTTON_SIZE,
+  DESIGN_WIDTH,
   HEADER_BUTTON_SIZE,
+  ISLAND_CENTRE_X,
   MIN_VIEWPORT_SCALE,
   TILE_HEIGHT,
+  anchorX,
+  stageMetrics,
   tileWidth,
 } from '../src/game/theme';
 
@@ -74,17 +78,45 @@ describe('game bands — regression: hint text overlapped the mechanic label', (
 });
 
 describe('header layout — regression: wordmark clipped', () => {
-  it('header controls sit inside the design width', () => {
-    const leftEdge = 96 - HEADER_BUTTON_SIZE.width / 2;
-    const rightEdge = 1280 - 96 + HEADER_BUTTON_SIZE.width / 2;
-    expect(leftEdge).toBeGreaterThanOrEqual(0);
-    expect(rightEdge).toBeLessThanOrEqual(1280);
+  const VIEWPORTS = [
+    [932, 430],
+    [915, 412],
+    [1280, 720],
+    [1180, 820],
+    [1024, 768],
+  ] as const;
+
+  it('header controls are anchored inside the LIVE stage, not the 1280 island', () => {
+    for (const [vw, vh] of VIEWPORTS) {
+      const stage = stageMetrics(vw, vh);
+      const inset = 92;
+      for (const kind of ['left', 'right'] as const) {
+        const x = anchorX(stage, { kind, inset });
+        expect(x - HEADER_BUTTON_SIZE.width / 2, `${vw}x${vh} ${kind}`).toBeGreaterThanOrEqual(
+          stage.left,
+        );
+        expect(x + HEADER_BUTTON_SIZE.width / 2, `${vw}x${vh} ${kind}`).toBeLessThanOrEqual(
+          stage.right,
+        );
+      }
+    }
   });
 
-  it('header buttons clear the tier/level text block', () => {
-    const buttonRight = 96 + HEADER_BUTTON_SIZE.width / 2;
-    // Tier label is centred, roughly 80px wide.
-    const tierLeft = 640 - 40;
+  it('header buttons clear the tier/level text block on the island', () => {
+    const stage = stageMetrics(1280, 720);
+    const buttonRight = anchorX(stage, { kind: 'left', inset: 92 }) + HEADER_BUTTON_SIZE.width / 2;
+    // Tier label is centred on the island, roughly 80px wide.
+    const tierLeft = ISLAND_CENTRE_X - 40;
     expect(tierLeft).toBeGreaterThan(buttonRight);
+  });
+
+  it('the OLD fixed x=92 / x=DESIGN_WIDTH-92 anchor would drift on a phone stage', () => {
+    // Canary: proves the anchoring rule is load-bearing at 932x430. In world px
+    // the fixed anchors sit ~140-230px short of the visible edges.
+    const stage = stageMetrics(932, 430);
+    const fixedRight = DESIGN_WIDTH - 92;
+    const anchoredRight = anchorX(stage, { kind: 'right', inset: 92 });
+    expect(anchoredRight - fixedRight).toBeGreaterThan(100);
+    expect(92 - anchorX(stage, { kind: 'left', inset: 92 })).toBeGreaterThan(100);
   });
 });

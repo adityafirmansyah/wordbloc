@@ -18,8 +18,10 @@ function start(): void {
 
   const game = new Phaser.Game(createGameConfig(parent));
 
-  // Touch-target gate: below s=0.5 no fixed design size can reach 64 CSS px, so
+  // Touch-target gate: below scale 0.5 no fixed design size can reach 64 CSS px, so
   // an overlay asks the player to rotate / enlarge instead of serving tiny tiles.
+  // (Under Scale.RESIZE the canvas is already full-bleed; this only decides whether
+  // the playable stage is presented at all.)
   const syncGate = (): void => {
     gateCurrentViewport(window);
   };

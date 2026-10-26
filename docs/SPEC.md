@@ -7,7 +7,10 @@ Domain: wordbloc.com (purchasing is owner-gated, NOT part of this build)
 ## Stack (LOCKED — do not re-litigate)
 - **Phaser 3** (npm `phaser`, v3.80+) + **TypeScript** + **Vite**.
 - Renderer: `Phaser.AUTO` (WebGL with Canvas 2D fallback) — required for low-spec Android.
-- Target: 1280x720 design space, `Scale.FIT` + center, portrait/landscape safe.
+- Target: full-bleed stage. `Phaser.Scale.RESIZE` (canvas == viewport, never letterboxed)
+  over a 1280x720 design **island** that the main camera zooms and centres; the live
+  stage grows in width (aspect > 16:9) or height (aspect < 16:9) so content always
+  fills the screen edge to edge. Portrait/landscape safe via the viewport gate.
 - No backend in v1. All level data is static JSON bundled from `src/data/`.
 - Capacitor wiring comes in a LATER milestone. v1 must run with `npm run dev` in a browser.
 
@@ -128,6 +131,53 @@ Nothing else re-downloads, and no other file needs editing.
 - Wordbook screen listing unlocked words with replay audio.
 - Placeholder art (procedural Phaser Graphics shapes) — real art is a separate milestone.
 - Placeholder audio: silent/no-audio graceful degradation, never a crash if a key is missing.
+
+## Scale / Viewport Model (living section)
+
+Ruled after the mobile defect "on mobile the layout did not use full space".
+
+- `Phaser.Scale.RESIZE` with `autoCenter: NO_CENTER`. The canvas is sized to `#game`
+  (100% x 100%), so `canvas.getBoundingClientRect()` equals the viewport rect at every
+  aspect ratio — no letterbox bars, ever. Canvas pixels are CSS pixels (`autoRound`),
+  which keeps the fill-rate budget sane on 2GB-RAM Android.
+- Content is authored against a fixed **design island** of 1280x720 (`DESIGN_WIDTH` /
+  `DESIGN_HEIGHT`) whose centre is `(ISLAND_CENTRE_X, ISLAND_CENTRE_Y)`. Scenes centre
+  their content on that island; the main camera is zoomed by the stage scale and centred
+  on it (`src/ui/stage.ts`), so the island always appears centred on screen.
+- The live stage is derived from the viewport aspect (`stageMetrics()` in
+  `src/game/theme.ts`):
+
+  ```
+  aspect = viewportWidth / viewportHeight
+  width  = max(MIN_DESIGN_WIDTH, DESIGN_HEIGHT * aspect)
+  height = width / aspect
+  scale  = viewportWidth / width   (=== viewportHeight / height)
+  ```
+
+  `MIN_DESIGN_WIDTH` is 1280: it is the narrowest stage on which the widest
+  fixed-width surface still fits (Wordbook panel 980 + pager arrows at 76/width-76
+  needs >= 1264; the Game tray wraps at 1180).
+- **Narrow viewports grow the visible HEIGHT, not the content.** When the aspect is
+  narrower than 16:9 (tablet landscape, e.g. 1180x820 or 1024x768) the stage width is
+  pinned at 1280 and the visible height grows past 720, so the extra room becomes sky
+  above and below the island band instead of dead letterbox bars. Content is never
+  down-scaled by a second mechanism: `scale` is one number for the whole renderer, which
+  keeps the touch-target math exact.
+- Full-bleed background, centred content. The gradient backdrop is stretched over the
+  live stage and its hills/clouds are painted at fractions of the live stage, so the
+  decoration reaches the screen edges; panels keep their authored content width (Wordbook
+  980, Reward 800) centred on the island.
+- Edge-anchored surfaces (header icon buttons, Wordbook pager arrows and Back,
+  confetti bounds, floating tiles) use `anchorX()` against the LIVE stage edges, not the
+  1280 constant, so nothing drifts inside the frame or clips on a wider stage.
+- Resize handling is coalesced to one layout pass per animation frame
+  (`src/ui/frameCoalesce.ts`) and only repositions/camera-zooms existing objects, so the
+  procedural atlas is never rebuilt by a resize.
+- Portrait phones (and landscape windows below the floor) are gated: `viewportFit()`
+  reports 'rotate' / 'too-small' and the HTML overlay takes over, because no fixed design
+  size can honour the 64 CSS px touch-target floor there. Under the full-bleed model the
+  effective scale is still `min(vw/1280, vh/720)`, so the floor is `vh >= 360` CSS px on
+  wide screens and `vw >= 640` CSS px on squarer ones.
 
 ## Hard Constraints
 - 60 FPS on a 2GB-RAM Android (Unisoc/Helio A22 class). Single texture atlas for UI.

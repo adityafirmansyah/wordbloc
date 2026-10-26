@@ -12,6 +12,7 @@ import {
   frameBucketFor,
   slotDoneFrameFor,
   slotFrameFor,
+  stageMetrics,
   tileFrameFor,
   tileWidth,
 } from '../src/game/theme';
@@ -44,8 +45,10 @@ describe('touch targets (spec: >= 64x64 CSS px)', () => {
   });
 
   it('documents the 0.5 worst-case scale used for the math', () => {
-    // 640x360 CSS viewport => min(640/1280, 360/720) = 0.5
-    expect(Math.min(640 / DESIGN_WIDTH, 360 / DESIGN_HEIGHT)).toBe(MIN_VIEWPORT_SCALE);
+    // 640x360 CSS viewport => min(640/1280, 360/720) = 0.5 under the full-bleed
+    // stage model too (scale is width/width for narrow, height/height for wide).
+    expect(stageMetrics(640, 360).scale).toBe(MIN_VIEWPORT_SCALE);
+    expect(stageMetrics(932, 360).scale).toBe(MIN_VIEWPORT_SCALE);
   });
 });
 

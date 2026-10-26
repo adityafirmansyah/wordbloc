@@ -9,13 +9,16 @@ import {
 } from '../src/ui/viewportGate';
 
 /**
- * Regression guard for review finding B3.
+ * Regression guard for review finding B3, re-pinned for the full-bleed stage.
  *
- * Scale.FIT renders the fixed 1280x720 stage at s = min(vw/1280, vh/720). Design
- * sizes are tuned so a tile is exactly 64 CSS px at s = 0.5 (640x360 landscape).
- * On a portrait phone s falls to 0.28-0.32 and the same tile renders at 36-41 CSS
- * px — no fixed design size satisfies the spec floor there, so the app must not
- * present the stage: it asks the player to rotate or enlarge the window instead.
+ * Old model: Scale.FIT over a fixed 1280x720 stage, s = min(vw/1280, vh/720),
+ * letterboxed on any non-16:9 viewport. New model (Scale.RESIZE): the canvas is
+ * the viewport and the camera maps the design island onto it, so the effective
+ * scale is still `min(vw/1280, vh/720)` but nothing is letterboxed. Design sizes
+ * are tuned so a tile is exactly 64 CSS px at scale 0.5. On a portrait phone the
+ * scale falls to 0.28-0.32 and the same tile renders at 36-41 CSS px — no fixed
+ * design size satisfies the spec floor there, so the app must not present the
+ * stage: it asks the player to rotate or enlarge the window instead.
  */
 
 const PORTRAIT = [
@@ -30,7 +33,9 @@ const LANDSCAPE = [
   [844, 390],
   [1280, 720],
   [1920, 1080],
-  [768, 1024], // portrait tablet, but s = 0.6 >= 0.5 -> playable
+  [932, 430], // iPhone 14 Plus landscape — full-bleed phone stage
+  [1180, 820], // iPad Air landscape — full-bleed narrow stage
+  [768, 1024], // portrait tablet, but scale = 0.6 >= 0.5 -> playable
 ] as const;
 
 describe('viewportFit', () => {
@@ -59,10 +64,15 @@ describe('viewportFit', () => {
     expect(fit.notice).toBe('none');
   });
 
-  it('reports the Scale.FIT factor it used', () => {
+  it('reports the stage scale it used (vh-driven when wide, vw-driven when narrow)', () => {
     expect(viewportFit(1280, 720).scale).toBe(1);
     expect(viewportFit(640, 360).scale).toBe(0.5);
-    expect(viewportFit(2560, 720).scale).toBe(1); // width-limited by height
+    // 2560x720: wider than 16:9, so the stage grows sideways and the scale is
+    // driven by height alone — the full-bleed model keeps it at 1, not < 1.
+    expect(viewportFit(2560, 720).scale).toBe(1);
+    // 1180x820: narrower than 16:9, so the stage grows vertically and the scale
+    // is driven by width alone.
+    expect(viewportFit(1180, 820).scale).toBeCloseTo(1180 / 1280, 6);
   });
 
   it('degrades safely on a zero-size viewport instead of dividing by zero', () => {

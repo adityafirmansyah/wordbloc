@@ -1,14 +1,32 @@
-import { DESIGN_HEIGHT, DESIGN_WIDTH, viewportFit, type ViewportNotice } from '../game/theme';
+import {
+  DESIGN_HEIGHT,
+  MIN_DESIGN_WIDTH,
+  MIN_VIEWPORT_SCALE,
+  viewportFit,
+  type ViewportNotice,
+} from '../game/theme';
 
 /**
  * Viewport gate — makes the "Touch targets >= 64x64 CSS px" constraint true across
  * the WHOLE viewport domain instead of only in landscape.
  *
- * Scale.FIT renders the fixed 1280x720 design space at `s = min(vw/1280, vh/720)`.
- * Design sizes are chosen so a tile is 64 CSS px at s = 0.5 (a 640x360 landscape
- * phone). On a portrait phone s is ~0.28-0.32, which renders the same tile at
- * 36-41 CSS px — no fixed design size can satisfy the floor there, so the honest
- * fix is to not present the playable stage at all: rotate, or enlarge the window.
+ * Under the full-bleed stage model (Scale.RESIZE + camera-mapped island, see the
+ * STAGE MODEL note in `src/game/theme.ts`) the effective scale is
+ *
+ *     scale = min(vw / 1280, vh / 720)
+ *
+ * exactly as under the old Scale.FIT — but now the canvas fills the viewport at
+ * every aspect instead of letterboxing. Because the scale is still that min, the
+ * gate's arithmetic is unchanged in spirit and its boundary can be stated per
+ * regime, which is what the notices now say:
+ *
+ *   - landscape wider than 16:9 (phones): the scale is vh / 720, so the floor is
+ *     a HEIGHT floor — vh >= 360 CSS px.
+ *   - landscape narrower than 16:9 (tablets, small windows): the scale is vw/1280,
+ *     so the floor is a WIDTH floor — vw >= 640 CSS px.
+ *   - portrait: the stage cannot honour it at any phone size (a portrait phone
+ *     renders a tile at 36-41 CSS px), so the honest fix is to ask for a rotation
+ *     rather than serve un-tappable controls.
  *
  * This module is DOM-only and Phaser-free so it is unit-testable in jsdom.
  */
@@ -25,7 +43,7 @@ export const NOTICE_COPY: Readonly<Record<Exclude<ViewportNotice, 'none'>, Notic
   },
   'too-small': {
     title: 'Window too small',
-    body: 'Make the window bigger (or use a larger screen) so the letter tiles stay big enough to tap.',
+    body: 'Make the window at least 360px tall (or 640px wide on a squarer screen) so the letter tiles stay big enough to tap.',
   },
 };
 
@@ -70,5 +88,12 @@ export function gateCurrentViewport(
   return applyViewportNotice(win.document, notice);
 }
 
-/** Design constants re-exported so the gate and the tests agree on one source. */
-export const GATE_DESIGN = { width: DESIGN_WIDTH, height: DESIGN_HEIGHT } as const;
+/**
+ * Design constants re-exported so the gate and the tests agree on one source.
+ * `width` is the live stage FLOOR (see MIN_DESIGN_WIDTH), not a fixed canvas.
+ */
+export const GATE_DESIGN = {
+  width: MIN_DESIGN_WIDTH,
+  height: DESIGN_HEIGHT,
+  minScale: MIN_VIEWPORT_SCALE,
+} as const;

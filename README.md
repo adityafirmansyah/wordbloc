@@ -43,7 +43,7 @@ PORT=2610 npm run dev
 src/
   main.ts                 entry — validates level data, boots Phaser
   game/
-    config.ts             Phaser config (AUTO renderer, Scale.FIT 1280x720)
+    config.ts             Phaser config (AUTO renderer, Scale.RESIZE full-bleed)
     levelTypes.ts         frozen level + manifest contract types, LevelContractError
     levelLoader.ts        validating parsers (readable throws)
     levels.ts             manifest lookups + lazy per-level loading + cache
@@ -52,10 +52,12 @@ src/
     wordbook.ts           localStorage persistence (graceful degradation)
     audio.ts              phonics playback facade (never crashes on a missing key)
     uiAtlas.ts            builds ONE procedural texture atlas at boot
-    theme.ts              design tokens, layout bands, touch-target math
+    theme.ts              design tokens, stage model, layout bands, touch-target math
     rng.ts                seeded PRNG for stable tray shuffles
   scenes/                 Boot -> Menu -> Game -> Reward -> Wordbook
   ui/kit.ts               shared button / text / panel helpers
+  ui/stage.ts             camera + backdrop + edge anchoring for the live stage
+  ui/frameCoalesce.ts     one layout pass per animation frame on resize bursts
   data/levels/
     manifest.json         index of all 30 levels (sync, lightweight)
     tier-1..tier-5/       one JSON per level -> one lazy JS chunk each
@@ -93,19 +95,33 @@ degrades to silence (or the Web Speech API when available). A missing audio key
 never throws. Placing a tile speaks the **phoneme**; completing a word speaks the
 **whole word** — letter names are a defect per the spec.
 
-### Touch targets
+### Stage & touch targets
 
-Design space is 1280x720 with `Scale.FIT`, so at the smallest supported viewport
-(640x360 landscape, factor 0.5) every interactive element must be >= 128 design px
-to clear the spec's 64x64 CSS px floor. Tiles and buttons are sized accordingly, and
-`tests/theme.test.ts`, `tests/layout.regression.test.ts` and
-`tests/wordbookLayout.regression.test.ts` enforce it.
+`Scale.RESIZE` sizes the canvas to `#game` (the viewport), so the canvas rect always
+equals the viewport rect and there is never a letterbox bar. Content is authored against
+a 1280x720 design _island_; the main camera zooms by the stage scale and centres on it
+(`src/ui/stage.ts`), and the live stage grows in width (aspect > 16:9, phones) or height
+(aspect < 16:9, tablets) so the screen is filled edge to edge. `stageMetrics()`
+(`src/game/theme.ts`) is the single source of truth for that geometry; the full model is
+in `docs/SPEC.md`.
 
-Below factor 0.5 no fixed design size can satisfy the floor — a portrait phone
-renders the same tile at 36-41 CSS px. Rather than serve un-tappable controls,
-`viewportFit()` (`src/game/theme.ts`) + `src/ui/viewportGate.ts` replace the playable
-stage with a readable overlay asking the player to rotate (portrait) or enlarge the
-window (tiny landscape). `tests/viewportGate.test.ts` pins the boundary.
+The effective scale is still `min(vw/1280, vh/720)`, so at the smallest supported
+viewport (640x360 landscape, factor 0.5) every interactive element must be >= 128 design
+px to clear the spec's 64x64 CSS px floor. Tiles and buttons are sized accordingly, and
+`tests/theme.test.ts`, `tests/layout.regression.test.ts`,
+`tests/wordbookLayout.regression.test.ts` and `tests/stage.test.ts` enforce it across
+932x430 / 915x412 / 1280x720 / 1180x820 / 1024x768.
+
+Below factor 0.5 no fixed design size can satisfy the floor — a portrait phone renders the
+same tile at 36-41 CSS px. Rather than serve un-tappable controls, `viewportFit()`
+(`src/game/theme.ts`) + `src/ui/viewportGate.ts` replace the playable stage with a
+readable overlay asking the player to rotate (portrait) or enlarge the window (below
+`vh >= 360` on wide screens, `vw >= 640` on squarer ones). `tests/viewportGate.test.ts`
+pins the boundary.
+
+Resize bursts collapse into one layout pass per animation frame
+(`src/ui/frameCoalesce.ts`) and only move existing objects, so the procedural atlas is
+never rebuilt by a resize.
 
 ### Phonics data invariant
 

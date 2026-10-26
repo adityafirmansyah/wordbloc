@@ -1,13 +1,47 @@
 /**
- * Visual + layout constants. Placeholder art only — real art is a later milestone.
- * Design space is 1280x720 (docs/SPEC.md) with Scale.FIT + center.
+ * Visual + layout constants and the stage (viewport) model.
+ * Placeholder art only — real art is a later milestone.
+ *
+ * STAGE MODEL (Scale.RESIZE — replaces the old Scale.FIT + letterboxed 1280x720)
+ * -----------------------------------------------------------------------------
+ * The canvas now always fills the browser viewport 1:1 (Phaser.Scale.RESIZE sizes
+ * the canvas to #game, which is 100% x 100%), so there is never a dead letterbox
+ * bar. Scenes still author against a fixed CONTENT ISLAND of DESIGN_WIDTH x
+ * DESIGN_HEIGHT whose centre is (ISLAND_CENTRE_X, ISLAND_CENTRE_Y); the camera is
+ * zoomed and centred on that island, so the island stays centred while the
+ * background paints edge to edge.
+ *
+ * The live stage is the part of the world the viewport actually shows:
+ *
+ *     aspect = viewportWidth / viewportHeight
+ *     width  = max(MIN_DESIGN_WIDTH, DESIGN_HEIGHT * aspect)   // world px
+ *     height = width / aspect                                  // world px
+ *     scale  = viewportWidth / width  (=== viewportHeight / height)
+ *
+ * `width * scale === viewportWidth` and `height * scale === viewportHeight` by
+ * construction, which is what makes the canvas full-bleed at EVERY aspect ratio.
+ *
+ * Two regimes fall out of that one formula:
+ *   - WIDE (aspect >= 16:9, e.g. phone landscape 932x430 = 2.17:1):
+ *     width grows, height stays 720. The island sits in the middle and extra sky
+ *     is painted left/right; the scale is driven by HEIGHT alone (vh / 720).
+ *   - NARROW (aspect < 16:9, e.g. tablet landscape 1180x820 = 1.44:1):
+ *     width is pinned at MIN_DESIGN_WIDTH so the widest fixed-width surface still
+ *     fits, and the visible HEIGHT GROWS past 720 instead of letterboxing
+ *     vertically. The island band stays vertically centred with sky above/below;
+ *     the scale is driven by WIDTH alone (vw / 1280).
+ *
+ * "Grow the visible height" is the ONE mechanism chosen for narrow viewports (as
+ * opposed to down-scaling content through a second camera zoom): content always
+ * renders at exactly `scale` CSS px per design px, so the touch-target math below
+ * stays exact and one number describes both regimes.
  *
  * TOUCH-TARGET MATH (spec: "Touch targets >= 64x64 CSS px")
- * Scale.FIT renders the 1280x720 design space at `s = min(vw/1280, vh/720)`.
- * Every interactive element is therefore sized so that `size * s >= 64` at the
- * smallest viewport we support (640x360 CSS, i.e. a phone in landscape, s = 0.5):
- *   - tiles      128 x 144 design -> 64 x 72 CSS at s = 0.5
- *   - buttons    128 tall design  -> 64 CSS tall at s = 0.5
+ * In both regimes `scale === min(vw / DESIGN_WIDTH, vh / DESIGN_HEIGHT)`. Every
+ * interactive element is sized so `size * scale >= 64` at the smallest supported
+ * viewport (640x360 CSS, i.e. a phone in landscape, scale = 0.5):
+ *   - tiles      128 x 144 design -> 64 x 72 CSS at scale 0.5
+ *   - buttons    128 tall design  -> 64 CSS tall at scale 0.5
  *
  * Below that scale the 64px floor cannot be met for ANY fixed design size, so the
  * app refuses to present the playable stage: `viewportFit()` reports 'rotate'
@@ -19,17 +53,96 @@
 export const DESIGN_WIDTH = 1280;
 export const DESIGN_HEIGHT = 720;
 
-/** Worst-case Scale.FIT factor we design touch targets for (640x360 CSS). */
+/** Centre of the content island — every scene centres its content here. */
+export const ISLAND_CENTRE_X = DESIGN_WIDTH / 2;
+export const ISLAND_CENTRE_Y = DESIGN_HEIGHT / 2;
+
+/**
+ * Narrowest live stage width (world px). Below this the fixed-width surfaces stop
+ * fitting: the Wordbook panel is 980 wide with pager arrows at 76 / width-76
+ * (needs >= 1264) and GameScene's tray wraps at TRAY_MAX_WIDTH = 1180. Pinning the
+ * stage to the island width satisfies both by construction.
+ */
+export const MIN_DESIGN_WIDTH = DESIGN_WIDTH;
+
+/** Worst-case stage scale we design touch targets for (640x360 CSS). */
 export const MIN_VIEWPORT_SCALE = 0.5;
 
 /** Viewport gate verdict: playable, rotate the device, or enlarge the window. */
 export type ViewportNotice = 'none' | 'rotate' | 'too-small';
 
 export interface ViewportFit {
-  /** Scale.FIT factor for this viewport. */
+  /** Stage scale for this viewport (design px -> CSS px). */
   scale: number;
   /** What to tell the player. 'none' means the stage is playable. */
   notice: ViewportNotice;
+}
+
+/**
+ * The live, full-bleed stage for a viewport. All values are world (design) px
+ * except `scale`, which converts world px to CSS px.
+ */
+export interface StageMetrics {
+  /** Visible stage width; always >= MIN_DESIGN_WIDTH. */
+  width: number;
+  /** Visible stage height; always >= DESIGN_HEIGHT. */
+  height: number;
+  /** World px -> CSS px factor (0 only for a degenerate 0-area viewport). */
+  scale: number;
+  /** World x of the visible left edge (negative when the stage is wider). */
+  left: number;
+  /** World x of the visible right edge. */
+  right: number;
+  /** World y of the visible top edge (negative when the stage is taller). */
+  top: number;
+  /** World y of the visible bottom edge. */
+  bottom: number;
+  /** World x of the content island centre (constant: the island never moves). */
+  centreX: number;
+  /** World y of the content island centre. */
+  centreY: number;
+}
+
+/**
+ * The stage model. Pure: this is the single source of truth for how a viewport
+ * maps onto the design space, used by the camera binding (src/ui/stage.ts), the
+ * scenes, and the viewport gate.
+ */
+export function stageMetrics(viewportWidth: number, viewportHeight: number): StageMetrics {
+  const vw = Number.isFinite(viewportWidth) && viewportWidth > 0 ? viewportWidth : 0;
+  const vh = Number.isFinite(viewportHeight) && viewportHeight > 0 ? viewportHeight : 0;
+
+  if (vw === 0 || vh === 0) {
+    // Degenerate viewport: describe the island so nothing divides by zero.
+    return {
+      width: MIN_DESIGN_WIDTH,
+      height: DESIGN_HEIGHT,
+      scale: 0,
+      left: ISLAND_CENTRE_X - MIN_DESIGN_WIDTH / 2,
+      right: ISLAND_CENTRE_X + MIN_DESIGN_WIDTH / 2,
+      top: 0,
+      bottom: DESIGN_HEIGHT,
+      centreX: ISLAND_CENTRE_X,
+      centreY: ISLAND_CENTRE_Y,
+    };
+  }
+
+  const aspect = vw / vh;
+  const width = Math.max(MIN_DESIGN_WIDTH, DESIGN_HEIGHT * aspect);
+  const height = width / aspect;
+  const scale = vw / width;
+
+  return {
+    width,
+    height,
+    scale,
+    left: ISLAND_CENTRE_X - width / 2,
+    right: ISLAND_CENTRE_X + width / 2,
+    top: ISLAND_CENTRE_Y - height / 2,
+    bottom: ISLAND_CENTRE_Y + height / 2,
+    centreX: ISLAND_CENTRE_X,
+    centreY: ISLAND_CENTRE_Y,
+  };
 }
 
 /**
@@ -38,8 +151,8 @@ export interface ViewportFit {
  * (portrait) or enlarge the window (landscape) instead of serving 36px buttons.
  */
 export function viewportFit(width: number, height: number): ViewportFit {
-  const scale = Math.min(width / DESIGN_WIDTH, height / DESIGN_HEIGHT);
-  if (!Number.isFinite(scale) || scale >= MIN_VIEWPORT_SCALE - 1e-9) {
+  const scale = stageMetrics(width, height).scale;
+  if (Number.isFinite(scale) && scale >= MIN_VIEWPORT_SCALE - 1e-9) {
     return { scale, notice: 'none' };
   }
   return { scale, notice: height > width ? 'rotate' : 'too-small' };
@@ -222,6 +335,12 @@ export const HEADER_BUTTON_SIZE = { width: 128, height: 128 } as const;
  *    grid   186..594  (3 rows x 128 + 2 x 12 gaps)
  *    pager  316..448  (side arrows only, clear of the 186..1094 card band)
  *    pager caption    y 650 (638..662), below the grid
+ *
+ * HORIZONTAL anchoring: `inset` values are measured from the LIVE stage edge
+ * (`wordbookPagerX`, `wordbookColumnX`), not from the 1280 design width, so on a
+ * wide phone stage the arrows hug the screen edges and the cards stay centred in
+ * whatever the viewport shows. The panel keeps its 980px content width and is
+ * centred: a centred content island in a full-bleed sky.
  */
 export const WORDBOOK = {
   columns: 3,
@@ -230,20 +349,56 @@ export const WORDBOOK = {
   card: { width: 292, height: 128 },
   gapX: 16,
   gapY: 12,
-  /** Pager arrow centres: far left / far right, vertically centred on the grid. */
+  /** Pager arrows: `pagerInset` from each live stage edge, vertically centred. */
   pagerY: 390,
-  pagerX: { left: 76, right: DESIGN_WIDTH - 76 },
+  pagerInset: 76,
   pagerButtonSize: 132,
   /** Caption row under the grid (page indicator). */
   pagerCaptionY: 650,
-  /** Back lives in the header, not under the grid. */
-  backButton: { x: 116, y: 76, width: 200, height: 132 },
+  /** Back lives in the header, `backInset` from the live stage's left edge. */
+  backInset: 116,
+  backButtonY: 76,
+  backButtonWidth: 200,
+  backButtonHeight: 132,
   /**
-   * Backdrop panel, sized to sit exactly BETWEEN the pager arrows (142..1138) and
-   * below the header (150..700), so no control straddles its rounded edge.
+   * Backdrop panel, sized to sit exactly BETWEEN the pager arrows and below the
+   * header, so no control straddles its rounded edge. Centred on the stage.
    */
-  panel: { x: DESIGN_WIDTH / 2, y: 425, width: 980, height: 550 },
+  panel: { y: 425, width: 980, height: 550 },
 } as const;
+
+/** Pager arrow centres for a live stage: `pagerInset` inside its left/right edges. */
+export function wordbookPagerX(stage: StageMetrics): { left: number; right: number } {
+  return { left: stage.left + WORDBOOK.pagerInset, right: stage.right - WORDBOOK.pagerInset };
+}
+
+/** The Wordbook Back button rect for a live stage (header, hugging the left edge). */
+export function wordbookBackX(stage: StageMetrics): number {
+  return stage.left + WORDBOOK.backInset;
+}
+
+/**
+ * Horizontal anchoring rule for an object that follows the live stage.
+ * Centred content needs no rule at all (the camera keeps the island centred);
+ * this exists for surfaces that hug a stage edge — header buttons, pager arrows,
+ * decorations — so they stay inside the frame on any aspect ratio.
+ */
+export type StageAnchor =
+  | { readonly kind: 'centre'; readonly dx?: number }
+  | { readonly kind: 'left'; readonly inset: number }
+  | { readonly kind: 'right'; readonly inset: number };
+
+/** Stage-relative x for an anchor. Pure, so the rule itself is unit-tested. */
+export function anchorX(stage: StageMetrics, anchor: StageAnchor): number {
+  switch (anchor.kind) {
+    case 'left':
+      return stage.left + anchor.inset;
+    case 'right':
+      return stage.right - anchor.inset;
+    case 'centre':
+      return stage.centreX + (anchor.dx ?? 0);
+  }
+}
 
 export const WORDBOOK_PER_PAGE = WORDBOOK.columns * WORDBOOK.rows;
 
@@ -255,9 +410,9 @@ export const WORDBOOK_GRID_BOTTOM =
 export const WORDBOOK_GRID_WIDTH =
   WORDBOOK.columns * WORDBOOK.card.width + (WORDBOOK.columns - 1) * WORDBOOK.gapX;
 
-/** x of the column `col` centre (0-based), centred on the stage. */
+/** x of the column `col` centre (0-based), centred on the content island. */
 export function wordbookColumnX(col: number, columnsInRow: number = WORDBOOK.columns): number {
-  return DESIGN_WIDTH / 2 + (col - (columnsInRow - 1) / 2) * (WORDBOOK.card.width + WORDBOOK.gapX);
+  return ISLAND_CENTRE_X + (col - (columnsInRow - 1) / 2) * (WORDBOOK.card.width + WORDBOOK.gapX);
 }
 
 /** y of the row `row` centre (0-based). */

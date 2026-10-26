@@ -20,9 +20,9 @@ import {
   ATLAS_KEY,
   BANDS,
   COLORS,
-  DESIGN_WIDTH,
   FONT_FAMILY,
   FRAMES,
+  ISLAND_CENTRE_X,
   SCENES,
   SLOT_GAP,
   TILE_HEIGHT,
@@ -37,7 +37,8 @@ import {
   withinDropZone,
 } from '../game/theme';
 import type { Level, Mechanic } from '../game/levelTypes';
-import { makeIconButton, makeText } from '../ui/kit';
+import { makeEdgeIconButton, makeText } from '../ui/kit';
+import { StageLayout } from '../ui/stage';
 
 interface GameSceneData {
   levelId?: string;
@@ -80,6 +81,7 @@ const DRAG_DEPTH = 1000;
 export class GameScene extends Phaser.Scene {
   private level!: Level;
   private audio!: AudioManager;
+  private layout!: StageLayout;
 
   /** Level id requested by the previous scene; resolved asynchronously in create(). */
   private requestedLevelId = 'lvl_0001';
@@ -111,6 +113,11 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.audio = new AudioManager(this);
     this.audio.setEnabled(this.registry.get('muted') !== true);
+
+    // Full-bleed stage (camera zoom + centred content island). Everything below
+    // anchors to the island centre; only the header controls and decorations hug
+    // the live stage edges.
+    this.layout = new StageLayout(this);
 
     this.slots = [];
     this.tiles = [];
@@ -168,9 +175,9 @@ export class GameScene extends Phaser.Scene {
     // Keep the diagnostic detail but wrap it: a raw Vite import error carries a
     // full asset URL and used to run 300+px off each side of the stage.
     const detail = error instanceof Error ? error.message : String(error);
-    makeText(this, DESIGN_WIDTH / 2, 372, 'Could not load this level.', 34, '#c24848', true);
+    makeText(this, ISLAND_CENTRE_X, 372, 'Could not load this level.', 34, '#c24848', true);
     this.add
-      .text(DESIGN_WIDTH / 2, 416, detail, {
+      .text(ISLAND_CENTRE_X, 416, detail, {
         fontFamily: FONT_FAMILY,
         fontSize: '22px',
         color: '#54708c',
@@ -181,8 +188,9 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5, 0)
       .setDepth(5);
 
-    makeIconButton(this, {
-      x: DESIGN_WIDTH / 2,
+    makeEdgeIconButton(this, this.layout, {
+      edge: 'left',
+      inset: 92,
       y: BANDS.trayCenterY,
       frame: FRAMES.home,
       size: 132,
@@ -194,21 +202,18 @@ export class GameScene extends Phaser.Scene {
 
   private drawLoading(display: string): void {
     this.board = this.add.container(0, 0);
-    const strip = this.add.image(DESIGN_WIDTH / 2, 360, ATLAS_KEY, FRAMES.bgStrip);
-    strip.setDisplaySize(DESIGN_WIDTH, 720);
-    strip.setDepth(-100);
-    this.board.add(strip);
 
-    const card = this.add.image(DESIGN_WIDTH / 2, 360, ATLAS_KEY, FRAMES.panel);
+    const card = this.add.image(ISLAND_CENTRE_X, 360, ATLAS_KEY, FRAMES.panel);
     card.setDisplaySize(520, 180);
     this.board.add(card);
-    this.board.add(makeText(this, DESIGN_WIDTH / 2, 332, 'Loading…', 40, '#21324a', true));
-    this.board.add(makeText(this, DESIGN_WIDTH / 2, 386, display, 30, '#7f95ab'));
+    this.board.add(makeText(this, ISLAND_CENTRE_X, 332, 'Loading…', 40, '#21324a', true));
+    this.board.add(makeText(this, ISLAND_CENTRE_X, 386, display, 30, '#7f95ab'));
 
     // Escape hatch while the chunk is in flight: without it a stalled download
     // would trap the player on a card with no controls at all.
-    const home = makeIconButton(this, {
-      x: 92,
+    const home = makeEdgeIconButton(this, this.layout, {
+      edge: 'left',
+      inset: 92,
       y: BANDS.headerCenterY,
       frame: FRAMES.home,
       size: 132,
@@ -226,7 +231,6 @@ export class GameScene extends Phaser.Scene {
   private drawBoard(): void {
     this.filled = targetUnits(this.level).map(() => null);
 
-    this.drawBackground();
     this.drawHeader();
     this.drawArt();
     this.drawHint();
@@ -244,15 +248,12 @@ export class GameScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- chrome
 
-  private drawBackground(): void {
-    const strip = this.add.image(DESIGN_WIDTH / 2, 360, ATLAS_KEY, FRAMES.bgStrip);
-    strip.setDisplaySize(DESIGN_WIDTH, 720);
-    strip.setDepth(-100);
-  }
-
   private drawHeader(): void {
-    const back = makeIconButton(this, {
-      x: 92,
+    // Header controls hug the LIVE stage edges: on a 2.17:1 phone stage a fixed
+    // x=92 would sit ~340px inside the frame in world space and drift out of it.
+    const back = makeEdgeIconButton(this, this.layout, {
+      edge: 'left',
+      inset: 92,
       y: BANDS.headerCenterY,
       frame: FRAMES.home,
       size: 132,
@@ -261,23 +262,25 @@ export class GameScene extends Phaser.Scene {
     back.setDepth(20);
 
     const muted = this.registry.get('muted') === true;
-    const sound = makeIconButton(this, {
-      x: DESIGN_WIDTH - 92,
+    const sound = makeEdgeIconButton(this, this.layout, {
+      edge: 'right',
+      inset: 92,
       y: BANDS.headerCenterY,
       frame: muted ? FRAMES.lock : FRAMES.speaker,
       size: 132,
       onClick: () => this.toggleMute(sound),
     });
     sound.setDepth(20);
-    this.mutedLabel = makeText(this, DESIGN_WIDTH - 92, 158, 'muted', 20, '#c24848', true);
+    this.mutedLabel = makeText(this, 0, 158, 'muted', 20, '#c24848', true);
+    this.layout.attach(this.mutedLabel, { kind: 'right', inset: 92 });
     this.mutedLabel.setDepth(20);
     this.mutedLabel.setVisible(muted);
 
     const tierLabel = `Tier ${this.level.tier}`;
-    makeText(this, DESIGN_WIDTH / 2, BANDS.headerCenterY - 14, tierLabel, 30, '#54708c', true);
+    makeText(this, ISLAND_CENTRE_X, BANDS.headerCenterY - 14, tierLabel, 30, '#54708c', true);
     makeText(
       this,
-      DESIGN_WIDTH / 2,
+      ISLAND_CENTRE_X,
       BANDS.headerCenterY + 26,
       `Level ${manifestIndexOf(this.level.id) + 1} of ${this.registry.get('levelCount') ?? manifestCount()}`,
       24,
@@ -304,7 +307,7 @@ export class GameScene extends Phaser.Scene {
   /** Procedural "illustration" placeholder: a tinted card + category glyph. */
   private drawArt(): void {
     const { width, height } = BANDS.artSize;
-    const card = this.add.image(DESIGN_WIDTH / 2, BANDS.artCenterY, ATLAS_KEY, FRAMES.card);
+    const card = this.add.image(ISLAND_CENTRE_X, BANDS.artCenterY, ATLAS_KEY, FRAMES.card);
     card.setDisplaySize(width, height);
     card.setDepth(1);
 
@@ -314,16 +317,16 @@ export class GameScene extends Phaser.Scene {
     const seed = this.level.id.charCodeAt(this.level.id.length - 1) * 37;
     glyph.fillStyle(palette[seed % palette.length] ?? 0xffd9c7, 1);
     glyph.fillRoundedRect(
-      DESIGN_WIDTH / 2 - width / 2 + 10,
+      ISLAND_CENTRE_X - width / 2 + 10,
       BANDS.artCenterY - height / 2 + 10,
       width - 20,
       height - 20,
       18,
     );
     glyph.fillStyle(0xffffff, 0.9);
-    glyph.fillCircle(DESIGN_WIDTH / 2, BANDS.artCenterY, 46);
+    glyph.fillCircle(ISLAND_CENTRE_X, BANDS.artCenterY, 46);
     this.add
-      .text(DESIGN_WIDTH / 2, BANDS.artCenterY, this.level.display.charAt(0).toUpperCase(), {
+      .text(ISLAND_CENTRE_X, BANDS.artCenterY, this.level.display.charAt(0).toUpperCase(), {
         fontFamily: FONT_FAMILY,
         fontSize: '64px',
         color: '#21324a',
@@ -335,7 +338,7 @@ export class GameScene extends Phaser.Scene {
 
   private drawHint(): void {
     if (this.level.hint) {
-      makeText(this, DESIGN_WIDTH / 2, BANDS.hintY, this.level.hint, 28, '#54708c');
+      makeText(this, ISLAND_CENTRE_X, BANDS.hintY, this.level.hint, 28, '#54708c');
     }
   }
 
@@ -361,7 +364,9 @@ export class GameScene extends Phaser.Scene {
     const widths = units.map((unit) => tileWidth(unit.unit));
     const total =
       widths.reduce<number>((acc, w) => acc + w, 0) + SLOT_GAP * Math.max(0, units.length - 1);
-    let cursorX = DESIGN_WIDTH / 2 - total / 2;
+    // Centred on the content ISLAND, not on a hardcoded 1280: the island is what
+    // the camera keeps under the viewport centre at every aspect ratio.
+    let cursorX = ISLAND_CENTRE_X - total / 2;
 
     units.forEach((target, index) => {
       const width = widths[index] ?? 128;
@@ -403,7 +408,7 @@ export class GameScene extends Phaser.Scene {
 
     makeText(
       this,
-      DESIGN_WIDTH / 2,
+      ISLAND_CENTRE_X,
       BANDS.mechanicY,
       this.mechanicLabel(this.level.mechanic),
       26,
@@ -447,7 +452,7 @@ export class GameScene extends Phaser.Scene {
       const widths = trayRow.map((item) => tileWidth(item.unit));
       const total =
         widths.reduce<number>((acc, w) => acc + w, 0) + TRAY_GAP * Math.max(0, trayRow.length - 1);
-      let cursorX = DESIGN_WIDTH / 2 - total / 2;
+      let cursorX = ISLAND_CENTRE_X - total / 2;
       const y = trayTop + rowIndex * rowHeight;
 
       trayRow.forEach((item, i) => {
@@ -690,15 +695,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   private confetti(): void {
+    const stage = this.layout.metrics;
     for (let i = 0; i < 34; i += 1) {
-      const x = Phaser.Math.Between(80, DESIGN_WIDTH - 80);
-      const dot = this.add.image(x, -20, ATLAS_KEY, FRAMES.dot);
+      const x = Phaser.Math.Between(stage.left + 80, stage.right - 80);
+      const dot = this.add.image(x, stage.top - 20, ATLAS_KEY, FRAMES.dot);
       dot.setDepth(900);
       dot.setTint(COLORS.confetti[i % COLORS.confetti.length] ?? 0xffffff);
       dot.setScale(Phaser.Math.FloatBetween(0.5, 1.1));
       this.tweens.add({
         targets: dot,
-        y: 760,
+        y: stage.bottom + 40,
         x: x + Phaser.Math.Between(-90, 90),
         angle: Phaser.Math.Between(-360, 360),
         duration: Phaser.Math.Between(1100, 2100),

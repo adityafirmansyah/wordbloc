@@ -1,33 +1,6 @@
 import Phaser from 'phaser';
-import {
-  ATLAS_KEY,
-  BANDS,
-  BUTTON_SIZE,
-  COLORS,
-  DESIGN_HEIGHT,
-  DESIGN_WIDTH,
-  FONT_FAMILY,
-  FRAMES,
-} from '../game/theme';
-
-/** Background: gradient + procedural hills/clouds, all from the atlas. */
-export function drawBackdrop(scene: Phaser.Scene): void {
-  const strip = scene.add.image(DESIGN_WIDTH / 2, DESIGN_HEIGHT / 2, ATLAS_KEY, FRAMES.bgStrip);
-  strip.setDisplaySize(DESIGN_WIDTH, DESIGN_HEIGHT);
-  strip.setDepth(-100);
-
-  // Decorative hills (pure Graphics, never interactive, never in the way).
-  const g = scene.add.graphics();
-  g.setDepth(-90);
-  g.fillStyle(COLORS.hill, 0.55);
-  g.fillEllipse(240, DESIGN_HEIGHT + 90, 760, 340);
-  g.fillEllipse(1040, DESIGN_HEIGHT + 120, 900, 380);
-  g.fillStyle(0xffffff, 0.5);
-  g.fillEllipse(180, 120, 260, 96);
-  g.fillEllipse(340, 96, 200, 76);
-  g.fillEllipse(1080, 150, 300, 104);
-  g.fillEllipse(1240, 110, 220, 80);
-}
+import { ATLAS_KEY, BANDS, BUTTON_SIZE, FONT_FAMILY, FRAMES } from '../game/theme';
+import type { StageLayout } from './stage';
 
 export interface ButtonOptions {
   x: number;
@@ -99,7 +72,7 @@ export interface IconButtonOptions {
   label?: string;
 }
 
-/** Square icon button (>=128x128 design px => 64x64 CSS at s=0.5). */
+/** Square icon button (>=128x128 design px => 64x64 CSS at scale 0.5). */
 export function makeIconButton(
   scene: Phaser.Scene,
   opts: IconButtonOptions,
@@ -156,6 +129,32 @@ export function makeText(
       align: 'center',
     })
     .setOrigin(0.5);
+}
+
+/**
+ * Header icon button pinned to a live stage edge (left/right), so it stays inside
+ * the frame on a wide phone stage instead of drifting off it.
+ */
+export function makeEdgeIconButton(
+  scene: Phaser.Scene,
+  layout: StageLayout,
+  opts: {
+    edge: 'left' | 'right';
+    inset: number;
+    y: number;
+    frame: string;
+    onClick: () => void;
+    size?: number;
+  },
+): Phaser.GameObjects.Container {
+  const button = makeIconButton(scene, {
+    x: 0,
+    y: opts.y,
+    frame: opts.frame,
+    onClick: opts.onClick,
+    size: opts.size,
+  });
+  return layout.attach(button, { kind: opts.edge, inset: opts.inset });
 }
 
 export function makePanel(
