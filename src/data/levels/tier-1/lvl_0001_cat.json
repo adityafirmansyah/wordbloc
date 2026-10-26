@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0001",
+  "tier": 1,
+  "word": "CAT",
+  "display": "cat",
+  "meaning_id": "kucing",
+  "category": "animals",
+  "mechanic": "letter_drag",
+  "image": "animals/cat",
+  "audio_word": "words/cat",
+  "audio_phonemes": ["phonemes/k", "phonemes/ae", "phonemes/t"],
+  "tiles": ["C", "A", "T"],
+  "distractors": [],
+  "chunks": null,
+  "hint": "It says meow.",
+  "ghost_letters": true
+}

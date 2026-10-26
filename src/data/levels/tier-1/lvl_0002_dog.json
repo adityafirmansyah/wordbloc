@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0002",
+  "tier": 1,
+  "word": "DOG",
+  "display": "dog",
+  "meaning_id": "anjing",
+  "category": "animals",
+  "mechanic": "letter_drag",
+  "image": "animals/dog",
+  "audio_word": "words/dog",
+  "audio_phonemes": ["phonemes/d", "phonemes/aw", "phonemes/g"],
+  "tiles": ["D", "O", "G"],
+  "distractors": [],
+  "chunks": null,
+  "hint": "It says woof.",
+  "ghost_letters": true
+}

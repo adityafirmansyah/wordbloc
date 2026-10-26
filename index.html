@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#9adaff" />
+    <meta
+      name="description"
+      content="WordBloc — build words, open worlds. A word-building game for kids."
+    />
+    <title>WordBloc</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ffd166'/%3E%3Ctext x='32' y='45' font-family='Trebuchet MS,sans-serif' font-size='36' font-weight='bold' text-anchor='middle' fill='%233a2a00'%3EW%3C/text%3E%3C/svg%3E"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #9adaff;
+        font-family: 'Trebuchet MS', 'Segoe UI', Verdana, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+      }
+      #game {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #game canvas {
+        display: block;
+        /* no text selection / OS drag on canvas during tile drags */
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+      }
+      /* Visible only if the game fails to boot — real errors go to console. */
+      #boot-failure {
+        display: none;
+        position: fixed;
+        inset: 0;
+        padding: 24px;
+        background: #fff;
+        color: #21324a;
+        font-size: 16px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        overflow: auto;
+        z-index: 10;
+      }
+      #boot-failure.visible {
+        display: block;
+      }
+      /*
+       * Viewport gate. Below Scale.FIT factor 0.5 the tiles would render smaller
+       * than the spec's 64x64 CSS px touch-target floor, so the playable stage is
+       * replaced by a readable instruction instead (portrait phone -> rotate,
+       * tiny window -> enlarge). See src/ui/viewportGate.ts.
+       */
+      #viewport-notice {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        padding: 32px;
+        background: #9adaff;
+        color: #21324a;
+        text-align: center;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 18px;
+      }
+      #viewport-notice.visible {
+        display: flex;
+      }
+      #viewport-notice .notice-icon {
+        width: 96px;
+        height: 96px;
+        border-radius: 22px;
+        background: #ffd166;
+        border: 5px solid #d99b1a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 52px;
+        font-weight: bold;
+        color: #3a2a00;
+      }
+      #viewport-notice h1 {
+        margin: 0;
+        font-size: 26px;
+        line-height: 1.25;
+      }
+      #viewport-notice p {
+        margin: 0;
+        max-width: 34ch;
+        font-size: 17px;
+        line-height: 1.45;
+        color: #33506b;
+      }
+      html.viewport-blocked #game {
+        visibility: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="viewport-notice" role="status" aria-live="polite" aria-hidden="true">
+      <div class="notice-icon" aria-hidden="true">&#8635;</div>
+      <h1 data-notice-title>Turn your device sideways</h1>
+      <p data-notice-body>
+        WordBloc plays best in landscape. Rotate the tablet or phone, then carry on.
+      </p>
+    </div>
+    <pre id="boot-failure" role="alert"></pre>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0023",
+  "tier": 3,
+  "word": "UMBRELLA",
+  "display": "umbrella",
+  "meaning_id": "payung",
+  "category": "home",
+  "mechanic": "syllable_tap",
+  "image": "home/umbrella",
+  "audio_word": "words/umbrella",
+  "audio_phonemes": ["phonemes/um", "phonemes/brel", "phonemes/la"],
+  "tiles": ["UM", "BREL", "LA"],
+  "distractors": ["UMB", "BRIL"],
+  "chunks": ["UM", "BREL", "LA"],
+  "hint": "You open it when it rains.",
+  "ghost_letters": false
+}

@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0010",
+  "tier": 1,
+  "word": "FISH",
+  "display": "fish",
+  "meaning_id": "ikan",
+  "category": "animals",
+  "mechanic": "letter_drag",
+  "image": "animals/fish",
+  "audio_word": "words/fish",
+  "audio_phonemes": ["phonemes/f", "phonemes/i", "phonemes/sh", "phonemes/sh"],
+  "tiles": ["F", "I", "S", "H"],
+  "distractors": [],
+  "chunks": null,
+  "hint": "It swims in the water.",
+  "ghost_letters": true
+}

@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0014",
+  "tier": 2,
+  "word": "WATER",
+  "display": "water",
+  "meaning_id": "air",
+  "category": "nature",
+  "mechanic": "letter_drag",
+  "image": "nature/water",
+  "audio_word": "words/water",
+  "audio_phonemes": ["phonemes/w", "phonemes/aw", "phonemes/t", "phonemes/er", "phonemes/er"],
+  "tiles": ["W", "A", "T", "E", "R"],
+  "distractors": ["S", "O", "B"],
+  "chunks": null,
+  "hint": "You drink it every day.",
+  "ghost_letters": false
+}

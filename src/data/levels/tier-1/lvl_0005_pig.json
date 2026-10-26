@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0005",
+  "tier": 1,
+  "word": "PIG",
+  "display": "pig",
+  "meaning_id": "babi",
+  "category": "animals",
+  "mechanic": "letter_drag",
+  "image": "animals/pig",
+  "audio_word": "words/pig",
+  "audio_phonemes": ["phonemes/p", "phonemes/i", "phonemes/g"],
+  "tiles": ["P", "I", "G"],
+  "distractors": [],
+  "chunks": null,
+  "hint": "A pink farm animal.",
+  "ghost_letters": true
+}

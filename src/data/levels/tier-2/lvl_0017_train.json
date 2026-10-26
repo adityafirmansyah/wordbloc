@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0017",
+  "tier": 2,
+  "word": "TRAIN",
+  "display": "train",
+  "meaning_id": "kereta",
+  "category": "transport",
+  "mechanic": "letter_drag",
+  "image": "transport/train",
+  "audio_word": "words/train",
+  "audio_phonemes": ["phonemes/t", "phonemes/r", "phonemes/ae", "phonemes/ae", "phonemes/n"],
+  "tiles": ["T", "R", "A", "I", "N"],
+  "distractors": ["S", "E"],
+  "chunks": null,
+  "hint": "It runs on rails and says choo choo.",
+  "ghost_letters": false
+}

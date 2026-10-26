@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0029",
+  "tier": 5,
+  "word": "REWRITE",
+  "display": "rewrite",
+  "meaning_id": "menulis ulang",
+  "category": "school",
+  "mechanic": "affix",
+  "image": "school/rewrite",
+  "audio_word": "words/rewrite",
+  "audio_phonemes": ["phonemes/re", "phonemes/write"],
+  "tiles": ["RE", "WRITE"],
+  "distractors": ["RITE", "WRITER"],
+  "chunks": ["RE", "WRITE"],
+  "hint": "Riddle: to write it again. Put a prefix before WRITE.",
+  "ghost_letters": false
+}

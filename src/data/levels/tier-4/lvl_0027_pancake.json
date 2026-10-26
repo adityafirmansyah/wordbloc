@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0027",
+  "tier": 4,
+  "word": "PANCAKE",
+  "display": "pancake",
+  "meaning_id": "pancake",
+  "category": "food",
+  "mechanic": "compound",
+  "image": "food/pancake",
+  "audio_word": "words/pancake",
+  "audio_phonemes": ["phonemes/pan", "phonemes/cake"],
+  "tiles": ["PAN", "CAKE"],
+  "distractors": ["CAKES", "PANS"],
+  "chunks": ["PAN", "CAKE"],
+  "hint": "Two words join: a pan + a cake.",
+  "ghost_letters": false
+}

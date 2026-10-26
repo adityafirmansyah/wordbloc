@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0007",
+  "tier": 1,
+  "word": "HAT",
+  "display": "hat",
+  "meaning_id": "topi",
+  "category": "clothes",
+  "mechanic": "letter_drag",
+  "image": "clothes/hat",
+  "audio_word": "words/hat",
+  "audio_phonemes": ["phonemes/h", "phonemes/ae", "phonemes/t"],
+  "tiles": ["H", "A", "T"],
+  "distractors": [],
+  "chunks": null,
+  "hint": "You wear it on your head.",
+  "ghost_letters": true
+}

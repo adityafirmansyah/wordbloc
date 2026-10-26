@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0009",
+  "tier": 1,
+  "word": "FROG",
+  "display": "frog",
+  "meaning_id": "katak",
+  "category": "animals",
+  "mechanic": "letter_drag",
+  "image": "animals/frog",
+  "audio_word": "words/frog",
+  "audio_phonemes": ["phonemes/f", "phonemes/r", "phonemes/o", "phonemes/g"],
+  "tiles": ["F", "R", "O", "G"],
+  "distractors": [],
+  "chunks": null,
+  "hint": "It hops and says ribbit.",
+  "ghost_letters": true
+}

@@ -7,7 +7,7 @@ Web-first (Phaser 3 + Vite + TypeScript), portabel ke Android (Capacitor) dan Wi
 ## Status
 
 - [x] Spec frozen — `docs/SPEC.md`
-- [ ] v1 scaffold + core loop (in progress, PR workflow)
+- [x] v1 scaffold + core loop (this milestone)
 - [ ] Real 2D art pass
 - [ ] Native audio pass (phonemes + words)
 - [ ] Capacitor Android wrapper
@@ -20,6 +20,100 @@ npm install
 npm run dev      # http://localhost:5173
 npm run build    # tsc -b && vite build
 ```
+
+Other scripts:
+
+```bash
+npm run lint          # ESLint flat config
+npm run format        # Prettier --write
+npm run format:check  # Prettier --check (CI gate)
+npm run typecheck     # tsc -b
+npm test              # vitest run
+```
+
+Set `PORT` to move the dev/preview server off the default port:
+
+```bash
+PORT=2610 npm run dev
+```
+
+## Architecture
+
+```
+src/
+  main.ts                 entry — validates level data, boots Phaser
+  game/
+    config.ts             Phaser config (AUTO renderer, Scale.FIT 1280x720)
+    levelTypes.ts         frozen level + manifest contract types, LevelContractError
+    levelLoader.ts        validating parsers (readable throws)
+    levels.ts             manifest lookups + lazy per-level loading + cache
+    puzzle.ts             pure core-loop rules (no Phaser) — unit tested
+    progress.ts           unlock / resume rules (manifest only)
+    wordbook.ts           localStorage persistence (graceful degradation)
+    audio.ts              phonics playback facade (never crashes on a missing key)
+    uiAtlas.ts            builds ONE procedural texture atlas at boot
+    theme.ts              design tokens, layout bands, touch-target math
+    rng.ts                seeded PRNG for stable tray shuffles
+  scenes/                 Boot -> Menu -> Game -> Reward -> Wordbook
+  ui/kit.ts               shared button / text / panel helpers
+  data/levels/
+    manifest.json         index of all 30 levels (sync, lightweight)
+    tier-1..tier-5/       one JSON per level -> one lazy JS chunk each
+tests/                    vitest suites (loader, catalog, data, puzzle, audio, layout)
+```
+
+### Level data
+
+Levels are modular: `src/data/levels/manifest.json` is a small synchronous index
+(id, tier, word, display, meaning, category, mechanic, file) and the full puzzle
+for each word lives in its own file under `src/data/levels/tier-N/`. Vite's
+`import.meta.glob` maps every level file to a separate chunk, so `loadLevel(id)`
+downloads exactly one puzzle and caches it; `preloadLevel(id)` warms the next one
+during play. Menu, Progress and Wordbook read the manifest only.
+
+Validation happens in two places: the manifest (plus "does every row have a
+bundled file?") is checked at boot in `main.ts`, and each level file is validated
+against the contract in `docs/SPEC.md` through `parseLevel()` the first time it is
+loaded. An unknown `mechanic`, a missing `tiles`/`chunks` array, a tile set that
+cannot spell the word, or a file that disagrees with its manifest row throws a
+`LevelContractError` naming the offending level and field.
+
+Adding a level is one new file plus one manifest row — nothing else re-downloads.
+
+### Rendering & assets
+
+All UI art is generated at boot into a single `ui` texture atlas
+(`src/game/uiAtlas.ts`) — the game performs **zero** per-file image requests.
+Real art replaces this atlas in a later milestone.
+
+### Audio
+
+`AudioManager` plays a decoded buffer when one exists for a key, and otherwise
+degrades to silence (or the Web Speech API when available). A missing audio key
+never throws. Placing a tile speaks the **phoneme**; completing a word speaks the
+**whole word** — letter names are a defect per the spec.
+
+### Touch targets
+
+Design space is 1280x720 with `Scale.FIT`, so at the smallest supported viewport
+(640x360 landscape, factor 0.5) every interactive element must be >= 128 design px
+to clear the spec's 64x64 CSS px floor. Tiles and buttons are sized accordingly, and
+`tests/theme.test.ts`, `tests/layout.regression.test.ts` and
+`tests/wordbookLayout.regression.test.ts` enforce it.
+
+Below factor 0.5 no fixed design size can satisfy the floor — a portrait phone
+renders the same tile at 36-41 CSS px. Rather than serve un-tappable controls,
+`viewportFit()` (`src/game/theme.ts`) + `src/ui/viewportGate.ts` replace the playable
+stage with a readable overlay asking the player to rotate (portrait) or enlarge the
+window (tiny landscape). `tests/viewportGate.test.ts` pins the boundary.
+
+### Phonics data invariant
+
+`audio_phonemes` must contain exactly **one key per slot** — one per letter for
+`letter_drag`, one per chunk otherwise. The loader throws a `LevelContractError`
+otherwise, so a sound can never shift onto its neighbour. Digraphs spanning two
+letter positions carry the same key twice (`HOUSE` = `h ow ow s silent`), and a
+letter that makes no sound uses the explicit `phonemes/silent` key.
 
 ## Docs
 

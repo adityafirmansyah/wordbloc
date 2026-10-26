@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0026",
+  "tier": 4,
+  "word": "RAINBOW",
+  "display": "rainbow",
+  "meaning_id": "pelangi",
+  "category": "nature",
+  "mechanic": "compound",
+  "image": "nature/rainbow",
+  "audio_word": "words/rainbow",
+  "audio_phonemes": ["phonemes/rain", "phonemes/bow"],
+  "tiles": ["RAIN", "BOW"],
+  "distractors": ["SNOW", "RAINS"],
+  "chunks": ["RAIN", "BOW"],
+  "hint": "Two words join: rain + a bow of colour.",
+  "ghost_letters": false
+}

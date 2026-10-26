@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0004",
+  "tier": 1,
+  "word": "BED",
+  "display": "bed",
+  "meaning_id": "tempat tidur",
+  "category": "home",
+  "mechanic": "letter_drag",
+  "image": "home/bed",
+  "audio_word": "words/bed",
+  "audio_phonemes": ["phonemes/b", "phonemes/e", "phonemes/d"],
+  "tiles": ["B", "E", "D"],
+  "distractors": [],
+  "chunks": null,
+  "hint": "You sleep on it.",
+  "ghost_letters": true
+}

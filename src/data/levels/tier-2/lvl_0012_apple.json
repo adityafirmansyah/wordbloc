@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0012",
+  "tier": 2,
+  "word": "APPLE",
+  "display": "apple",
+  "meaning_id": "apel",
+  "category": "food",
+  "mechanic": "letter_drag",
+  "image": "food/apple",
+  "audio_word": "words/apple",
+  "audio_phonemes": ["phonemes/ae", "phonemes/p", "phonemes/p", "phonemes/l", "phonemes/silent"],
+  "tiles": ["A", "P", "P", "L", "E"],
+  "distractors": ["S", "T"],
+  "chunks": null,
+  "hint": "A red fruit. One a day keeps the doctor away.",
+  "ghost_letters": false
+}

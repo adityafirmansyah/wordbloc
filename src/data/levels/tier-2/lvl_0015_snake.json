@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0015",
+  "tier": 2,
+  "word": "SNAKE",
+  "display": "snake",
+  "meaning_id": "ular",
+  "category": "animals",
+  "mechanic": "letter_drag",
+  "image": "animals/snake",
+  "audio_word": "words/snake",
+  "audio_phonemes": ["phonemes/s", "phonemes/n", "phonemes/ae", "phonemes/k", "phonemes/silent"],
+  "tiles": ["S", "N", "A", "K", "E"],
+  "distractors": ["T", "R", "B"],
+  "chunks": null,
+  "hint": "It has no legs and says ssss.",
+  "ghost_letters": false
+}

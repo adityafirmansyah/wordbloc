@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0008",
+  "tier": 1,
+  "word": "MAP",
+  "display": "map",
+  "meaning_id": "peta",
+  "category": "school",
+  "mechanic": "letter_drag",
+  "image": "school/map",
+  "audio_word": "words/map",
+  "audio_phonemes": ["phonemes/m", "phonemes/ae", "phonemes/p"],
+  "tiles": ["M", "A", "P"],
+  "distractors": [],
+  "chunks": null,
+  "hint": "It shows where places are.",
+  "ghost_letters": true
+}

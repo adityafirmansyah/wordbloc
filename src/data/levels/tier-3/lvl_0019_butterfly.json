@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0019",
+  "tier": 3,
+  "word": "BUTTERFLY",
+  "display": "butterfly",
+  "meaning_id": "kupu-kupu",
+  "category": "animals",
+  "mechanic": "syllable_tap",
+  "image": "animals/butterfly",
+  "audio_word": "words/butterfly",
+  "audio_phonemes": ["phonemes/but", "phonemes/ter", "phonemes/fly"],
+  "tiles": ["BUT", "TER", "FLY"],
+  "distractors": ["BAT", "BET"],
+  "chunks": ["BUT", "TER", "FLY"],
+  "hint": "It has colourful wings and flies.",
+  "ghost_letters": false
+}

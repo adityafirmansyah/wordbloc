@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0022",
+  "tier": 3,
+  "word": "RABBIT",
+  "display": "rabbit",
+  "meaning_id": "kelinci",
+  "category": "animals",
+  "mechanic": "syllable_tap",
+  "image": "animals/rabbit",
+  "audio_word": "words/rabbit",
+  "audio_phonemes": ["phonemes/rab", "phonemes/bit"],
+  "tiles": ["RAB", "BIT"],
+  "distractors": ["ROB", "BITS"],
+  "chunks": ["RAB", "BIT"],
+  "hint": "It has long ears and hops.",
+  "ghost_letters": false
+}

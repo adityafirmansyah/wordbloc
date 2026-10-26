@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0016",
+  "tier": 2,
+  "word": "MOUSE",
+  "display": "mouse",
+  "meaning_id": "tikus",
+  "category": "animals",
+  "mechanic": "letter_drag",
+  "image": "animals/mouse",
+  "audio_word": "words/mouse",
+  "audio_phonemes": ["phonemes/m", "phonemes/ow", "phonemes/ow", "phonemes/s", "phonemes/silent"],
+  "tiles": ["M", "O", "U", "S", "E"],
+  "distractors": ["P", "N"],
+  "chunks": null,
+  "hint": "A tiny animal that likes cheese.",
+  "ghost_letters": false
+}

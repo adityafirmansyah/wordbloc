@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0028",
+  "tier": 5,
+  "word": "UNHAPPY",
+  "display": "unhappy",
+  "meaning_id": "sedih",
+  "category": "feelings",
+  "mechanic": "affix",
+  "image": "feelings/unhappy",
+  "audio_word": "words/unhappy",
+  "audio_phonemes": ["phonemes/un", "phonemes/happy"],
+  "tiles": ["UN", "HAPPY"],
+  "distractors": ["HAP", "HAPPILY"],
+  "chunks": ["UN", "HAPPY"],
+  "hint": "Riddle: not glad. Put a prefix before HAPPY.",
+  "ghost_letters": false
+}

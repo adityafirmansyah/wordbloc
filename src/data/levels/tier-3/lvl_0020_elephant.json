@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0020",
+  "tier": 3,
+  "word": "ELEPHANT",
+  "display": "elephant",
+  "meaning_id": "gajah",
+  "category": "animals",
+  "mechanic": "syllable_tap",
+  "image": "animals/elephant",
+  "audio_word": "words/elephant",
+  "audio_phonemes": ["phonemes/el", "phonemes/e", "phonemes/phant"],
+  "tiles": ["EL", "E", "PHANT"],
+  "distractors": ["ANT", "ELE"],
+  "chunks": ["EL", "E", "PHANT"],
+  "hint": "A huge grey animal with a long trunk.",
+  "ghost_letters": false
+}

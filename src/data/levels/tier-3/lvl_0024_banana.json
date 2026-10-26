@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0024",
+  "tier": 3,
+  "word": "BANANA",
+  "display": "banana",
+  "meaning_id": "pisang",
+  "category": "food",
+  "mechanic": "syllable_tap",
+  "image": "food/banana",
+  "audio_word": "words/banana",
+  "audio_phonemes": ["phonemes/ba", "phonemes/na", "phonemes/na"],
+  "tiles": ["BA", "NA", "NA"],
+  "distractors": ["BAN", "NAB"],
+  "chunks": ["BA", "NA", "NA"],
+  "hint": "A long yellow fruit that monkeys love.",
+  "ghost_letters": false
+}

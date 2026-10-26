@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0003",
+  "tier": 1,
+  "word": "SUN",
+  "display": "sun",
+  "meaning_id": "matahari",
+  "category": "nature",
+  "mechanic": "letter_drag",
+  "image": "nature/sun",
+  "audio_word": "words/sun",
+  "audio_phonemes": ["phonemes/s", "phonemes/u", "phonemes/n"],
+  "tiles": ["S", "U", "N"],
+  "distractors": [],
+  "chunks": null,
+  "hint": "It shines in the sky.",
+  "ghost_letters": true
+}
