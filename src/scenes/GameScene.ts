@@ -161,18 +161,26 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showLoadFailure(error: unknown): void {
-    const message = error instanceof Error ? error.message : String(error);
     console.error('WordBloc: level failed to load.', error);
-    makeText(
-      this,
-      DESIGN_WIDTH / 2,
-      BANDS.slotsCenterY,
-      'Could not load this level.',
-      34,
-      '#c24848',
-      true,
-    );
-    makeText(this, DESIGN_WIDTH / 2, BANDS.hintY, message, 22, '#54708c');
+    // Drop the loading card first, or its "Loading…" text sits under the error.
+    this.clearLoading();
+
+    // Keep the diagnostic detail but wrap it: a raw Vite import error carries a
+    // full asset URL and used to run 300+px off each side of the stage.
+    const detail = error instanceof Error ? error.message : String(error);
+    makeText(this, DESIGN_WIDTH / 2, 372, 'Could not load this level.', 34, '#c24848', true);
+    this.add
+      .text(DESIGN_WIDTH / 2, 416, detail, {
+        fontFamily: FONT_FAMILY,
+        fontSize: '22px',
+        color: '#54708c',
+        align: 'center',
+        wordWrap: { width: 1000, useAdvancedWrap: true },
+        lineSpacing: 6,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(5);
+
     makeIconButton(this, {
       x: DESIGN_WIDTH / 2,
       y: BANDS.trayCenterY,
