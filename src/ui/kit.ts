@@ -60,9 +60,12 @@ export function makeButton(scene: Phaser.Scene, opts: ButtonOptions): Phaser.Gam
   const container = scene.add.container(opts.x, opts.y, [bg, label]);
   container.setSize(width, height);
 
-  // A transparent hit area is required for containers.
+  // Phaser's hit test normalizes the local point by adding displayOriginX/Y
+  // (half the object's size) before calling Contains, so the rectangle must
+  // start at 0,0 — NOT at -w/2. Using -w/2 shifts the whole hit area left by
+  // half the width, which silently made clicking/tapping grab the wrong object.
   container.setInteractive(
-    new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height),
+    new Phaser.Geom.Rectangle(0, 0, width, height),
     Phaser.Geom.Rectangle.Contains,
   );
 
@@ -108,8 +111,10 @@ export function makeIconButton(
 
   const container = scene.add.container(opts.x, opts.y, [bg, icon]);
   container.setSize(size, size);
+  // Rectangle must start at 0,0: Phaser adds displayOrigin before the Contains
+  // test (see makeButton in this file for the full explanation).
   container.setInteractive(
-    new Phaser.Geom.Rectangle(-size / 2, -size / 2, size, size),
+    new Phaser.Geom.Rectangle(0, 0, size, size),
     Phaser.Geom.Rectangle.Contains,
   );
 

@@ -337,8 +337,10 @@ export class GameScene extends Phaser.Scene {
         const container = this.add.container(x, y, [bg, label]);
         container.setSize(width, TILE_HEIGHT);
         container.setDepth(10);
+        // Hit rect starts at 0,0 — Phaser adds displayOrigin before Contains,
+        // so -w/2 here would shift the touch area left by half a tile.
         container.setInteractive(
-          new Phaser.Geom.Rectangle(-width / 2, -TILE_HEIGHT / 2, width, TILE_HEIGHT),
+          new Phaser.Geom.Rectangle(0, 0, width, TILE_HEIGHT),
           Phaser.Geom.Rectangle.Contains,
         );
         // Dragging is delta-based so the grab point is preserved.
