@@ -221,11 +221,6 @@ export function levelCatalog(): LevelCatalog {
   return shared;
 }
 
-/** Test seam: swap the shared catalogue (null restores the real one). */
-export function setLevelCatalogForTests(catalog: LevelCatalog | null): void {
-  shared = catalog;
-}
-
 // ------------------------------------------------------------ manifest helpers
 // Synchronous, manifest-only: safe for Menu / Progress / Wordbook rendering.
 
