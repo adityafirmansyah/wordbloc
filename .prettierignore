@@ -1,0 +1,6 @@
+dist
+node_modules
+package-lock.json
+coverage
+# docs/ is the frozen spec (docs/SPEC.md) — never reformat it.
+docs
