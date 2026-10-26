@@ -48,6 +48,20 @@
  * (portrait phone) or 'too-small' (tiny landscape window) and the HTML overlay in
  * index.html replaces the canvas with a readable instruction. That keeps the
  * constraint true across the whole viewport domain instead of only in landscape.
+ *
+ * RENDER RESOLUTION (measured trade-off, recorded so it is not rediscovered)
+ * Scale.RESIZE gives one canvas backing pixel per CSS pixel: Phaser sizes the
+ * canvas to the parent and deliberately ignores devicePixelRatio (see the
+ * fill-rate warning in ScaleManager's docs). The pre-fix FIT build instead drew
+ * 1280x720 backing pixels into a 764-CSS-px box at 932x430, i.e. ~1.67 backing px
+ * per CSS px, so a DPR-3 phone now rasterises type at 1.0 instead of 1.67 CSS-px
+ * density and the browser upscales it. Measured on the wordmark at DPR 3 the
+ * mid-tone edge band grows from 10.8% to 11.9% of the crop — a slight softening,
+ * still read as crisp, and NOT a layout regression. Raising the density needs the
+ * canvas backing store to differ from the game size, which Phaser's pointer
+ * transform (`displayScale = baseSize / canvasBounds`) ties to the game size; that
+ * is a separate renderer decision, not a layout one. Fill cost stays bounded by
+ * the viewport: 0.40M px at 932x430 vs the old fixed 0.92M px buffer.
  */
 
 export const DESIGN_WIDTH = 1280;
