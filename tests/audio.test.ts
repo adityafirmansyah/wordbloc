@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AudioManager, phonemeToSpeakable } from '../src/game/audio';
+import { AudioManager, SILENT_PHONEME, phonemeToSpeakable } from '../src/game/audio';
 
 /** Fake Phaser-ish scene: controls which audio keys "exist". */
 function makeHost(available: string[] = []) {
@@ -43,6 +43,13 @@ describe('phonemeToSpeakable (phonics contract)', () => {
 
   it('is empty-safe', () => {
     expect(phonemeToSpeakable('')).toBe('');
+  });
+
+  it('treats the explicit silent marker as no sound at all', () => {
+    // Silent letters get their own key so the phonics array stays 1:1 with slots.
+    // Speaking "silent" (or the letter name) would be a defect.
+    expect(phonemeToSpeakable(SILENT_PHONEME)).toBe('');
+    expect(phonemeToSpeakable('phonemes/silent')).toBe('');
   });
 });
 

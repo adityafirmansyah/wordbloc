@@ -83,9 +83,24 @@ never throws. Placing a tile speaks the **phoneme**; completing a word speaks th
 ### Touch targets
 
 Design space is 1280x720 with `Scale.FIT`, so at the smallest supported viewport
-(640x360, factor 0.5) every interactive element must be >= 128 design px to clear
-the spec's 64x64 CSS px floor. Tiles and buttons are sized accordingly, and
-`tests/theme.test.ts` + `tests/layout.regression.test.ts` enforce it.
+(640x360 landscape, factor 0.5) every interactive element must be >= 128 design px
+to clear the spec's 64x64 CSS px floor. Tiles and buttons are sized accordingly, and
+`tests/theme.test.ts`, `tests/layout.regression.test.ts` and
+`tests/wordbookLayout.regression.test.ts` enforce it.
+
+Below factor 0.5 no fixed design size can satisfy the floor — a portrait phone
+renders the same tile at 36-41 CSS px. Rather than serve un-tappable controls,
+`viewportFit()` (`src/game/theme.ts`) + `src/ui/viewportGate.ts` replace the playable
+stage with a readable overlay asking the player to rotate (portrait) or enlarge the
+window (tiny landscape). `tests/viewportGate.test.ts` pins the boundary.
+
+### Phonics data invariant
+
+`audio_phonemes` must contain exactly **one key per slot** — one per letter for
+`letter_drag`, one per chunk otherwise. The loader throws a `LevelContractError`
+otherwise, so a sound can never shift onto its neighbour. Digraphs spanning two
+letter positions carry the same key twice (`HOUSE` = `h ow ow s silent`), and a
+letter that makes no sound uses the explicit `phonemes/silent` key.
 
 ## Docs
 

@@ -59,6 +59,7 @@ const PHONEME_SAYABLE: Readonly<Record<string, string>> = {
   ie: 'eye',
   ow: 'oh',
   sh: 'shh',
+  schwa: 'uh',
   u: 'uh',
   e: 'eh',
   i: 'ih',
@@ -66,9 +67,17 @@ const PHONEME_SAYABLE: Readonly<Record<string, string>> = {
   a: 'ah',
 };
 
+/**
+ * Audio key for a slot whose letter makes no sound of its own (the E of HOUSE,
+ * the final E of APPLE/SNAKE). The spec requires ONE phoneme key per slot, so a
+ * silent letter is expressed explicitly instead of shifting a neighbour's sound.
+ */
+export const SILENT_PHONEME = 'phonemes/silent';
+
 /** Turns an audio key like "phonemes/ae" into something speakable. */
 export function phonemeToSpeakable(key: string): string {
   const slug = key.includes('/') ? (key.split('/').pop() ?? key) : key;
+  if (slug === '' || key === SILENT_PHONEME) return '';
   const mapped = PHONEME_SAYABLE[slug.toLowerCase()];
   return mapped ?? slug;
 }

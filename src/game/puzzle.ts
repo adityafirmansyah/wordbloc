@@ -17,13 +17,17 @@ export interface TargetUnit {
 /**
  * The ordered units that spell the word.
  * letter_drag -> one unit per character; chunk mechanics -> the `chunks` array.
+ *
+ * The loader enforces `audio_phonemes.length === units.length`, so there is no
+ * positional fallback here: a missing key would mean wrong sounds on the wrong
+ * letters (the exact defect the invariant prevents), so it degrades to '' (silent)
+ * rather than to a neighbouring sound.
  */
 export function targetUnits(level: Level): TargetUnit[] {
   const units = level.chunks && level.chunks.length > 0 ? level.chunks : [...level.word];
   return units.map((unit, index) => ({
     unit,
-    phoneme:
-      level.audio_phonemes[index] ?? level.audio_phonemes[level.audio_phonemes.length - 1] ?? '',
+    phoneme: level.audio_phonemes[index] ?? '',
   }));
 }
 

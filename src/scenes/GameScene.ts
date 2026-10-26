@@ -26,6 +26,7 @@ import {
   slotFrameFor,
   tileFrameFor,
   tileWidth,
+  withinDropZone,
 } from '../game/theme';
 import type { Level, Mechanic } from '../game/levelTypes';
 import { makeIconButton, makeText } from '../ui/kit';
@@ -79,6 +80,7 @@ export class GameScene extends Phaser.Scene {
   /** Slot the dragged tile is currently overlapping (highlighted). */
   private hoverSlot: SlotView | null = null;
   private dragging: TileView | null = null;
+  private mutedLabel!: Phaser.GameObjects.Text;
   private solved = false;
   private wrongDrops = 0;
 
@@ -149,14 +151,12 @@ export class GameScene extends Phaser.Scene {
       y: BANDS.headerCenterY,
       frame: muted ? FRAMES.lock : FRAMES.speaker,
       size: 132,
-      onClick: (): void => {
-        const next = !(this.registry.get('muted') === true);
-        this.registry.set('muted', next);
-        this.audio.setEnabled(!next);
-        this.scene.restart({ levelId: this.level.id });
-      },
+      onClick: () => this.toggleMute(sound),
     });
     sound.setDepth(20);
+    this.mutedLabel = makeText(this, DESIGN_WIDTH - 92, 158, 'muted', 20, '#c24848', true);
+    this.mutedLabel.setDepth(20);
+    this.mutedLabel.setVisible(muted);
 
     const tierLabel = `Tier ${this.level.tier}`;
     makeText(this, DESIGN_WIDTH / 2, BANDS.headerCenterY - 14, tierLabel, 30, '#54708c', true);
@@ -168,6 +168,22 @@ export class GameScene extends Phaser.Scene {
       24,
       '#7f95ab',
     );
+  }
+
+  /**
+   * Mute toggle. Only flips the audio flag — it must NOT restart the scene:
+   * a kid who has assembled half a word and then mutes the sound would lose it
+   * (measured: filled ['C','A',null] came back [null,null,null]).
+   */
+  private toggleMute(button: Phaser.GameObjects.Container): void {
+    const next = !(this.registry.get('muted') === true);
+    this.registry.set('muted', next);
+    this.audio.setEnabled(!next);
+    const icon = button.getAt(1);
+    if (icon instanceof Phaser.GameObjects.Image) {
+      icon.setFrame(next ? FRAMES.lock : FRAMES.speaker);
+    }
+    this.mutedLabel.setVisible(next);
   }
 
   /** Procedural "illustration" placeholder: a tinted card + category glyph. */
@@ -412,18 +428,11 @@ export class GameScene extends Phaser.Scene {
 
   /** The unfilled slot the tile is over and that would accept it. */
   private slotUnder(tile: TileView): SlotView | null {
-    for (const slot of this.slots) {
-      if (slot.filledBy) continue;
-      const dx = Math.abs(tile.container.x - slot.x);
-      const dy = Math.abs(tile.container.y - slot.y);
-      // Generous magnetic radius: half a tile plus 56 design px of slop.
-      if (dx <= slot.width / 2 + 56 && dy <= slot.height / 2 + 56) {
-        if (resolveDrop(this.level, tile.item.unit, slot.index, this.filled).snapTo !== null) {
-          return slot;
-        }
-      }
-    }
-    return null;
+    const slot = this.slotUnderNearest(tile);
+    if (!slot) return null;
+    return resolveDrop(this.level, tile.item.unit, slot.index, this.filled).snapTo !== null
+      ? slot
+      : null;
   }
 
   private onPointerUp(): void {
@@ -446,20 +455,21 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Nearest slot the tile is over, regardless of correctness (for feedback). */
+  /**
+   * Nearest unfilled slot inside the shared drop zone (`withinDropZone`), or null.
+   * Hover highlighting and the release decision both call this, so what lights up
+   * green is exactly what accepts the tile.
+   */
   private slotUnderNearest(tile: TileView): SlotView | null {
     let best: SlotView | null = null;
     let bestDist = Number.POSITIVE_INFINITY;
     for (const slot of this.slots) {
       if (slot.filledBy) continue;
-      const dx = Math.abs(tile.container.x - slot.x);
-      const dy = Math.abs(tile.container.y - slot.y);
-      if (dx <= slot.width / 2 + 20 && dy <= slot.height / 2 + 30) {
-        const dist = dx + dy;
-        if (dist < bestDist) {
-          bestDist = dist;
-          best = slot;
-        }
+      if (!withinDropZone(tile.container, slot)) continue;
+      const dist = Math.abs(tile.container.x - slot.x) + Math.abs(tile.container.y - slot.y);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = slot;
       }
     }
     return best;

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { createGameConfig } from './game/config';
 import { parseLevelPack } from './game/levelLoader';
+import { gateCurrentViewport } from './ui/viewportGate';
 import rawLevels from './data/levels.json';
 
 /**
@@ -15,6 +16,15 @@ function start(): void {
   parseLevelPack(rawLevels);
 
   const game = new Phaser.Game(createGameConfig(parent));
+
+  // Touch-target gate: below s=0.5 no fixed design size can reach 64 CSS px, so
+  // an overlay asks the player to rotate / enlarge instead of serving tiny tiles.
+  const syncGate = (): void => {
+    gateCurrentViewport(window);
+  };
+  syncGate();
+  window.addEventListener('resize', syncGate);
+  window.addEventListener('orientationchange', syncGate);
 
   // Expose for e2e/QA probing only; not used by gameplay.
   (window as Window & { __WORDblocGame?: Phaser.Game }).__WORDblocGame = game;

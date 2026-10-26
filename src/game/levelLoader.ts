@@ -1,3 +1,4 @@
+import { SILENT_PHONEME } from './audio';
 import {
   LevelContractError,
   MECHANICS,
@@ -111,6 +112,28 @@ export function parseLevel(raw: unknown, index: number): Level {
   }
 
   const word = requireString(raw, 'word', id);
+
+  // PHONICS INVARIANT (docs/SPEC.md "Phonics Rule"): one phoneme key per slot.
+  // A shorter array used to be tolerated and silently shifted every later sound
+  // onto the wrong letter (HOUSE spoke /s/ for U), so it is now a hard error.
+  const unitCount = isStringArray(chunks) && chunks.length > 0 ? chunks.length : word.length;
+  if (audioPhonemes.length !== unitCount) {
+    throw new LevelContractError(
+      `Level "${id}" (${word}) has ${audioPhonemes.length} audio_phonemes for ${unitCount} slots — ` +
+        `exactly one phoneme key is required per slot. Use "${SILENT_PHONEME}" for a silent letter.`,
+      id,
+      'audio_phonemes',
+    );
+  }
+  audioPhonemes.forEach((key, index) => {
+    if (key.length === 0) {
+      throw new LevelContractError(
+        `Level "${id}" has an empty audio_phonemes entry at slot ${index}.`,
+        id,
+        'audio_phonemes',
+      );
+    }
+  });
 
   // Guard: the tray must be able to spell the word. Catches typos in seed data.
   const required = isStringArray(chunks) && chunks.length > 0 ? chunks : [...word];

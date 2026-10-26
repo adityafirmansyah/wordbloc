@@ -91,6 +91,72 @@ describe('parseLevel — readable contract violations', () => {
     );
   });
 
+  it('throws when a level has fewer phonemes than slots (the HOUSE/MOUSE defect)', () => {
+    // lvl_0013 HOUSE shipped 4 phonemes for 5 slots; the old loader tolerated it
+    // and every later slot spoke its neighbour's sound (U said /s/, S said /e/).
+    expect(() =>
+      parseLevel(
+        {
+          ...validLevel,
+          id: 'lvl_house',
+          word: 'HOUSE',
+          display: 'house',
+          tiles: ['H', 'O', 'U', 'S', 'E'],
+          audio_phonemes: ['phonemes/h', 'phonemes/ow', 'phonemes/s', 'phonemes/e'],
+        },
+        0,
+      ),
+    ).toThrowError(/4 audio_phonemes for 5 slots/);
+  });
+
+  it('throws when a level has MORE phonemes than slots', () => {
+    expect(() =>
+      parseLevel(
+        { ...validLevel, audio_phonemes: ['phonemes/k', 'phonemes/ae', 'phonemes/t', 'x'] },
+        0,
+      ),
+    ).toThrowError(/4 audio_phonemes for 3 slots/);
+  });
+
+  it('names the level and the field on the phoneme-count error', () => {
+    try {
+      parseLevel({ ...validLevel, audio_phonemes: ['phonemes/k'] }, 0);
+      expect.fail('should have thrown');
+    } catch (error) {
+      const err = error as LevelContractError;
+      expect(err.levelId).toBe('lvl_x');
+      expect(err.field).toBe('audio_phonemes');
+      expect(err.message).toContain('silent');
+    }
+  });
+
+  it('throws on an empty phoneme key', () => {
+    expect(() =>
+      parseLevel({ ...validLevel, audio_phonemes: ['phonemes/k', '', 'phonemes/t'] }, 0),
+    ).toThrowError(/empty audio_phonemes entry at slot 1/);
+  });
+
+  it('accepts one silent marker per silent letter', () => {
+    const level = parseLevel(
+      {
+        ...validLevel,
+        id: 'lvl_apple',
+        word: 'APPLE',
+        display: 'apple',
+        tiles: ['A', 'P', 'P', 'L', 'E'],
+        audio_phonemes: [
+          'phonemes/ae',
+          'phonemes/p',
+          'phonemes/p',
+          'phonemes/l',
+          'phonemes/silent',
+        ],
+      },
+      0,
+    );
+    expect(level.audio_phonemes).toHaveLength(5);
+  });
+
   it('names the index when the entry is not an object', () => {
     expect(() => parseLevel('nope', 7)).toThrowError(/index 7/);
   });

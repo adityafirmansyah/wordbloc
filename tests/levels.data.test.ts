@@ -74,25 +74,77 @@ describe('seeded level data (docs/SPEC.md v1 scope)', () => {
     }
   });
 
-  it('gives every target unit a phoneme key', () => {
-    // Digraphs collapse several letters into one sound (HOUSE = h/ow/s/e), so
-    // the count need not equal the letter count — but every slot needs its sound.
+  it('gives every slot exactly one phoneme key (SPEC: Phonics Rule)', () => {
+    // This test would have FAILED before the round-1 fix: HOUSE/WATER/MOUSE had
+    // 4 phonemes for 5 slots and the old test only asserted `<= units`, encoding
+    // the bug as allowed. One key per slot is now the enforced invariant.
     for (const level of levels) {
-      const units = targetUnits(level).length;
-      expect(level.audio_phonemes.length, level.id).toBeGreaterThan(0);
-      expect(level.audio_phonemes.length, level.id).toBeLessThanOrEqual(units);
-      for (const key of level.audio_phonemes) {
-        expect(key.length, level.id).toBeGreaterThan(0);
-        expect(key, level.id).not.toMatch(/\.(mp3|wav|ogg)$/i);
-      }
+      const units = targetUnits(level);
+      expect(level.audio_phonemes.length, level.id).toBe(units.length);
     }
   });
 
-  it('spells the whole word in phonemes for chunk levels', () => {
+  it('maps each slot to its own sound — no shifted or duplicated neighbours', () => {
+    // Exact expected sequences for the levels that were wrong in round 1, plus
+    // the digraph/silent-letter cases that share the same root cause.
+    const expected: Record<string, string[]> = {
+      lvl_0010: ['f', 'i', 'sh', 'sh'], // FISH: SH is one sound spanning S and H
+      lvl_0011: ['t', 'ie', 'g', 'er', 'er'], // TIGER: ER spans E and R
+      lvl_0012: ['ae', 'p', 'p', 'l', 'silent'], // APPLE: final E is silent
+      lvl_0013: ['h', 'ow', 'ow', 's', 'silent'], // HOUSE: OU = /ow/, final E silent
+      lvl_0014: ['w', 'aw', 't', 'er', 'er'], // WATER: ER spans E and R
+      lvl_0015: ['s', 'n', 'ae', 'k', 'silent'], // SNAKE: final E is silent
+      lvl_0016: ['m', 'ow', 'ow', 's', 'silent'], // MOUSE: OU = /ow/, final E silent
+      lvl_0017: ['t', 'r', 'ae', 'ae', 'n'], // TRAIN: AI = /ae/
+    };
+    for (const [id, slugs] of Object.entries(expected)) {
+      const level = levels.find((l) => l.id === id);
+      expect(level, id).toBeDefined();
+      expect(
+        targetUnits(level!).map((unit) => unit.phoneme.split('/').pop()),
+        `${id} (${level!.word})`,
+      ).toEqual(slugs);
+    }
+  });
+
+  it('never plays a letter NAME for a letter_drag slot', () => {
+    // "cue ay tee" instead of /k/ /ae/ /t/ is a spec defect. For letter_drag every
+    // key must be a single-sound slug, a digraph slug, or the explicit silent marker.
+    // (Chunk mechanics intentionally use the chunk itself as the key, e.g.
+    // "phonemes/but" for the BUT syllable, so they are excluded here.)
+    const allowed = new Set([
+      'k',
+      'ae',
+      't',
+      'd',
+      'aw',
+      'g',
+      's',
+      'u',
+      'n',
+      'b',
+      'e',
+      'p',
+      'i',
+      'h',
+      'm',
+      'f',
+      'r',
+      'o',
+      'sh',
+      'ie',
+      'er',
+      'l',
+      'ow',
+      'w',
+      'silent',
+    ]);
     for (const level of levels) {
-      if (level.mechanic === 'letter_drag') continue;
-      // One phoneme key per chunk, so a tap always has a sound to play.
-      expect(level.audio_phonemes.length, level.id).toBe(targetUnits(level).length);
+      if (level.mechanic !== 'letter_drag') continue;
+      for (const unit of targetUnits(level)) {
+        const slug = unit.phoneme.split('/').pop() ?? '';
+        expect(allowed.has(slug), `${level.id} ${unit.unit} -> ${unit.phoneme}`).toBe(true);
+      }
     }
   });
 
