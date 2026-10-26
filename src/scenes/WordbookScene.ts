@@ -5,9 +5,9 @@ import { wordbook, type WordbookEntry } from '../game/wordbook';
 import {
   ATLAS_KEY,
   COLORS,
-  DESIGN_HEIGHT,
-  DESIGN_WIDTH,
+  FONT_FAMILY,
   FRAMES,
+  ISLAND_CENTRE_X,
   SCENES,
   WORDBOOK,
   WORDBOOK_GRID_BOTTOM,
@@ -15,7 +15,8 @@ import {
   wordbookColumnX,
   wordbookRowY,
 } from '../game/theme';
-import { makeButton, makeIconButton, makeText } from '../ui/kit';
+import { makeButton, makeEdgeIconButton, makeText } from '../ui/kit';
+import { StageLayout } from '../ui/stage';
 
 /**
  * Wordbook: every completed word, persisted in localStorage.
@@ -24,10 +25,16 @@ import { makeButton, makeIconButton, makeText } from '../ui/kit';
  *
  * Layout rule (see WORDBOOK in theme.ts): three rows of cards, pager arrows
  * OUTSIDE the card band on the left/right, page caption below the grid, Back in
- * the header. Nothing overlaps and nothing extends past the 720px stage.
+ * the header. Nothing overlaps and nothing extends past the 720px island.
+ *
+ * On a full-bleed stage the centred parts (title, panel, grid) stay centred on
+ * the island; the pager arrows and Back hug the LIVE stage edges instead of a
+ * hardcoded 1280 so they are always inside the frame (and reachable with a thumb
+ * on a wide phone screen).
  */
 export class WordbookScene extends Phaser.Scene {
   private audio!: AudioManager;
+  private layout!: StageLayout;
   private page = 0;
   private entries: WordbookEntry[] = [];
   private gridLayer!: Phaser.GameObjects.Container;
@@ -52,48 +59,49 @@ export class WordbookScene extends Phaser.Scene {
   }
 
   private drawBackdrop(): void {
-    const strip = this.add.image(DESIGN_WIDTH / 2, DESIGN_HEIGHT / 2, ATLAS_KEY, FRAMES.bgStrip);
-    strip.setDisplaySize(DESIGN_WIDTH, DESIGN_HEIGHT);
-    strip.setDepth(-100);
-    // Panel sits strictly between the pager arrows and below the header, so no
-    // rounded edge cuts through a control.
+    // Full-bleed gradient (camera-zoomed over the whole stage) + a centred 980px
+    // content panel: sky to every edge, content island in the middle.
+    this.layout = new StageLayout(this, { backdrop: true });
     this.add
-      .image(WORDBOOK.panel.x, WORDBOOK.panel.y, ATLAS_KEY, FRAMES.panel)
-      .setDisplaySize(WORDBOOK.panel.width, WORDBOOK.panel.height);
+      .image(ISLAND_CENTRE_X, WORDBOOK.panel.y, ATLAS_KEY, FRAMES.panel)
+      .setDisplaySize(WORDBOOK.panel.width, WORDBOOK.panel.height)
+      .setDepth(0);
   }
 
   private drawHeader(): void {
     // Back sits in the header (it used to sit under the grid, covering row 3 and
-    // overflowing the stage by 6px).
-    makeButton(this, {
-      x: WORDBOOK.backButton.x,
-      y: WORDBOOK.backButton.y,
+    // overflowing the stage by 6px), pinned inside the live stage's left edge.
+    const back = makeButton(this, {
+      x: 0,
+      y: WORDBOOK.backButtonY,
       label: 'Back',
-      width: WORDBOOK.backButton.width,
-      height: WORDBOOK.backButton.height,
+      width: WORDBOOK.backButtonWidth,
+      height: WORDBOOK.backButtonHeight,
       fontSize: 34,
       variant: 'alt',
       onClick: () => this.scene.start(SCENES.menu),
     });
+    this.layout.attach(back, { kind: 'left', inset: WORDBOOK.backInset });
 
-    makeIconButton(this, {
-      x: DESIGN_WIDTH - 92,
-      y: 76,
+    makeEdgeIconButton(this, this.layout, {
+      edge: 'right',
+      inset: 92,
+      y: WORDBOOK.backButtonY,
       frame: FRAMES.home,
       size: 132,
       onClick: () => this.scene.start(SCENES.menu),
     });
 
-    makeText(this, DESIGN_WIDTH / 2, 78, 'My Wordbook', 52, '#21324a', true);
+    makeText(this, ISLAND_CENTRE_X, 78, 'My Wordbook', 52, '#21324a', true);
 
     const total = manifestCount();
     const unlocked = this.entries.length;
-    makeText(this, DESIGN_WIDTH / 2, 130, `${unlocked} of ${total} words collected`, 26, '#54708c');
+    makeText(this, ISLAND_CENTRE_X, 130, `${unlocked} of ${total} words collected`, 26, '#54708c');
 
     // Progress pill, between the subtitle and the grid.
     const pillW = 420;
     const pillH = 16;
-    const x = DESIGN_WIDTH / 2 - pillW / 2;
+    const x = ISLAND_CENTRE_X - pillW / 2;
     const y = 164;
     const track = this.add.graphics();
     track.fillStyle(0xdfeaf3, 1);
@@ -135,8 +143,8 @@ export class WordbookScene extends Phaser.Scene {
 
   private drawEmptyState(): void {
     this.add
-      .text(DESIGN_WIDTH / 2, 380, 'No words yet.\nPlay a level to fill your wordbook!', {
-        fontFamily: '"Trebuchet MS", "Segoe UI", Verdana, sans-serif',
+      .text(ISLAND_CENTRE_X, 380, 'No words yet.\nPlay a level to fill your wordbook!', {
+        fontFamily: FONT_FAMILY,
         fontSize: '38px',
         color: '#7f95ab',
         align: 'center',
@@ -150,7 +158,7 @@ export class WordbookScene extends Phaser.Scene {
     const bg = this.add.image(0, 0, ATLAS_KEY, FRAMES.card).setDisplaySize(width, height);
     const word = this.add
       .text(0, -20, entry.word, {
-        fontFamily: '"Trebuchet MS", "Segoe UI", Verdana, sans-serif',
+        fontFamily: FONT_FAMILY,
         fontSize: entry.word.length > 8 ? '30px' : '38px',
         color: '#21324a',
         fontStyle: 'bold',
@@ -161,7 +169,7 @@ export class WordbookScene extends Phaser.Scene {
     const manifestEntry = manifestEntryById(entry.levelId);
     const meta = this.add
       .text(0, 22, `Tier ${entry.tier}${manifestEntry ? ` · ${manifestEntry.category}` : ''}`, {
-        fontFamily: '"Trebuchet MS", "Segoe UI", Verdana, sans-serif',
+        fontFamily: FONT_FAMILY,
         fontSize: '19px',
         color: '#7f95ab',
       })
@@ -173,7 +181,7 @@ export class WordbookScene extends Phaser.Scene {
 
     const card = this.add.container(x, y, [bg, word, meta, speakerBg, speaker]);
     card.setSize(width, height);
-    // Whole card is a >=292x128 design px target (>=146x64 CSS at s=0.5).
+    // Whole card is a >=292x128 design px target (>=146x64 CSS at scale 0.5).
     // Rect starts at 0,0: Phaser adds displayOrigin before the Contains test.
     card.setInteractive(
       new Phaser.Geom.Rectangle(0, 0, width, height),
@@ -201,28 +209,31 @@ export class WordbookScene extends Phaser.Scene {
   private drawPager(): void {
     const pages = this.pages();
 
-    // Side arrows: OUTSIDE the card band horizontally (cards span 186..1094),
-    // vertically centred on the grid so they never sit over a card.
-    this.prevButton = makeIconButton(this, {
-      x: WORDBOOK.pagerX.left,
+    // Side arrows: OUTSIDE the card band horizontally (cards span the island
+    // middle) and vertically centred on the grid, so they never sit over a card.
+    // Anchored to the live stage edges, they stay inside the frame on any aspect.
+    this.prevButton = makeEdgeIconButton(this, this.layout, {
+      edge: 'left',
+      inset: WORDBOOK.pagerInset,
       y: WORDBOOK.pagerY,
       frame: FRAMES.arrowLeft,
       size: WORDBOOK.pagerButtonSize,
       onClick: () => this.goToPage(this.page - 1),
     });
 
-    this.nextButton = makeIconButton(this, {
-      x: WORDBOOK.pagerX.right,
+    this.nextButton = makeEdgeIconButton(this, this.layout, {
+      edge: 'right',
+      inset: WORDBOOK.pagerInset,
       y: WORDBOOK.pagerY,
       frame: FRAMES.arrowRight,
       size: WORDBOOK.pagerButtonSize,
       onClick: () => this.goToPage(this.page + 1),
     });
 
-    // Caption below the grid (grid ends at WORDBOOK_GRID_BOTTOM = 594).
+    // Caption below the grid (grid ends at WORDBOOK_GRID_BOTTOM).
     this.pagerText = makeText(
       this,
-      DESIGN_WIDTH / 2,
+      ISLAND_CENTRE_X,
       WORDBOOK.pagerCaptionY,
       this.entries.length > 0 ? `Page ${this.page + 1} / ${pages}` : '',
       26,

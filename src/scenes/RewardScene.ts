@@ -8,8 +8,16 @@ import {
 } from '../game/levels';
 import { wordbook } from '../game/wordbook';
 import { AudioManager } from '../game/audio';
-import { ATLAS_KEY, COLORS, DESIGN_HEIGHT, DESIGN_WIDTH, FRAMES, SCENES } from '../game/theme';
+import {
+  ATLAS_KEY,
+  COLORS,
+  FRAMES,
+  ISLAND_CENTRE_X,
+  SCENES,
+  type StageMetrics,
+} from '../game/theme';
 import { makeButton, makeText } from '../ui/kit';
+import { StageLayout } from '../ui/stage';
 import type { Level, LevelManifestEntry } from '../game/levelTypes';
 
 interface RewardData {
@@ -20,6 +28,7 @@ interface RewardData {
 export class RewardScene extends Phaser.Scene {
   private levelId = 'lvl_0001';
   private audio!: AudioManager;
+  private layout!: StageLayout;
   /** Bumped per start so a level load that lands after navigation cannot draw. */
   private loadToken = 0;
 
@@ -89,14 +98,18 @@ export class RewardScene extends Phaser.Scene {
   }
 
   private drawBackdrop(): void {
-    const strip = this.add.image(DESIGN_WIDTH / 2, DESIGN_HEIGHT / 2, ATLAS_KEY, FRAMES.bgStrip);
-    strip.setDisplaySize(DESIGN_WIDTH, DESIGN_HEIGHT);
-    strip.setDepth(-100);
-    this.add.image(DESIGN_WIDTH / 2, 300, ATLAS_KEY, FRAMES.panel).setDisplaySize(800, 420);
+    // Full-bleed gradient + centred content island: the panel keeps its 800x420
+    // content size and stays centred, while the sky around it now reaches every
+    // screen edge.
+    this.layout = new StageLayout(this, { backdrop: true });
+    this.add
+      .image(ISLAND_CENTRE_X, 300, ATLAS_KEY, FRAMES.panel)
+      .setDisplaySize(800, 420)
+      .setDepth(0);
   }
 
   private drawStar(isNew: boolean): void {
-    const star = this.add.image(DESIGN_WIDTH / 2, 186, ATLAS_KEY, FRAMES.star).setScale(0.2);
+    const star = this.add.image(ISLAND_CENTRE_X, 186, ATLAS_KEY, FRAMES.star).setScale(0.2);
     this.tweens.add({
       targets: star,
       scale: 2.1,
@@ -108,7 +121,7 @@ export class RewardScene extends Phaser.Scene {
       },
     });
     this.add
-      .text(DESIGN_WIDTH / 2, 196, isNew ? '+1' : '', {
+      .text(ISLAND_CENTRE_X, 196, isNew ? '+1' : '', {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '46px',
         color: '#ffffff',
@@ -119,13 +132,13 @@ export class RewardScene extends Phaser.Scene {
   }
 
   private drawCopy(display: string): void {
-    makeText(this, DESIGN_WIDTH / 2, 296, 'Nice work!', 62, '#21324a', true);
-    makeText(this, DESIGN_WIDTH / 2, 366, `You built "${display}"`, 38, '#54708c');
+    makeText(this, ISLAND_CENTRE_X, 296, 'Nice work!', 62, '#21324a', true);
+    makeText(this, ISLAND_CENTRE_X, 366, `You built "${display}"`, 38, '#54708c');
 
     const total = manifestCount();
     makeText(
       this,
-      DESIGN_WIDTH / 2,
+      ISLAND_CENTRE_X,
       424,
       `${wordbook().count()} of ${total} words in your Wordbook`,
       26,
@@ -138,18 +151,18 @@ export class RewardScene extends Phaser.Scene {
 
     if (upcoming) {
       makeButton(this, {
-        x: DESIGN_WIDTH / 2,
+        x: ISLAND_CENTRE_X,
         y: 528,
         label: 'Next',
         onClick: () => this.scene.start(SCENES.game, { levelId: upcoming.id }),
         variant: 'primary',
       });
     } else {
-      makeText(this, DESIGN_WIDTH / 2, 528, 'You finished every level!', 32, '#54708c', true);
+      makeText(this, ISLAND_CENTRE_X, 528, 'You finished every level!', 32, '#54708c', true);
     }
 
     makeButton(this, {
-      x: DESIGN_WIDTH / 2 - 250,
+      x: ISLAND_CENTRE_X - 250,
       y: 654,
       label: 'Replay',
       width: 300,
@@ -160,7 +173,7 @@ export class RewardScene extends Phaser.Scene {
     });
 
     makeButton(this, {
-      x: DESIGN_WIDTH / 2 + 250,
+      x: ISLAND_CENTRE_X + 250,
       y: 654,
       label: 'Wordbook',
       width: 300,
@@ -172,10 +185,11 @@ export class RewardScene extends Phaser.Scene {
   }
 
   private confetti(): void {
+    const stage: StageMetrics = this.layout.metrics;
     for (let i = 0; i < 40; i += 1) {
       const dot = this.add.image(
-        Phaser.Math.Between(40, DESIGN_WIDTH - 40),
-        Phaser.Math.Between(-120, -10),
+        Phaser.Math.Between(stage.left + 40, stage.right - 40),
+        Phaser.Math.Between(stage.top - 120, stage.top - 10),
         ATLAS_KEY,
         FRAMES.dot,
       );
@@ -184,7 +198,7 @@ export class RewardScene extends Phaser.Scene {
       dot.setScale(Phaser.Math.FloatBetween(0.5, 1.2));
       this.tweens.add({
         targets: dot,
-        y: DESIGN_HEIGHT + 40,
+        y: stage.bottom + 40,
         x: dot.x + Phaser.Math.Between(-120, 120),
         angle: Phaser.Math.Between(-400, 400),
         duration: Phaser.Math.Between(1400, 2600),
