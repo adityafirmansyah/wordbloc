@@ -158,6 +158,50 @@ rewrite: HTTP 200 served=10910B repo=10910B OK
 SERVE GATE: PASS
 ```
 
+## No visual regression, proved two ways
+
+This change is audio-only, and that was verified rather than asserted.
+
+**1. Build artifacts.** The pre-change tree (main @ `45d389b`) and this branch
+were built separately and diffed. Every non-audio artifact —
+
+```
+=== all non-mp3 files: byte-identical? ===
+  ALL non-mp3 artifacts identical (JS, CSS, HTML, WebP)
+=== the 7 expected audio changes ===
+  dog: changed 9656B -> 7984B      map: changed 8820B -> 9238B
+  frog: changed 9238B -> 8820B     snake: changed 10492B -> 8820B
+  hat: changed 8402B -> 9656B      unhappy: changed 12581B -> 12581B
+  rewrite: changed 11745B -> 10910B
+=== all other mp3s must be untouched ===
+  (no output: all 73 other clips byte-identical)
+ARTIFACT GATE: PASS
+```
+
+All 31 JS chunks and all 30 WebP illustrations are **byte-identical**, so the
+rendering code and every image are unchanged — no restyle or layout shift is
+possible. The main JS chunk even keeps the same content hash
+(`index-DAJ1_IOQ.js`) on both builds.
+
+**2. Rendered pixels.** Both builds were served and screenshotted at 1280x720
+for every affected route. Screenshot hashes match exactly on all 7 replaced
+levels:
+
+```
+snake      base=728bef70ca10f103  branch=728bef70ca10f103  identical=True
+rewrite    base=caaa3ef77f28f0f0  branch=caaa3ef77f28f0f0  identical=True
+unhappy    base=41ed7c3d5ec35d5a  branch=41ed7c3d5ec35d5a  identical=True
+dog / frog / hat / map                                            identical=True
+```
+
+The menu needed one caveat: the first pass flagged it as different, but that was
+capture timing, not a regression. Re-shot with a settled frame it matched
+across 3 consecutive runs (`9dbcfabb490c464e` both sides), while the **baseline
+alone** produced two different hashes across its own runs
+(`9dbcfabb…`, `ccfce6a3…`) — the menu animates, so a single-shot hash is not a
+stable comparison there. The level frames, which are static after load, are the
+reliable signal and they match byte-for-byte.
+
 ## Gates
 
 | gate | command | result |
@@ -171,6 +215,9 @@ SERVE GATE: PASS
 | voice | voice gate over all 30 clips | PASS |
 | serve | 7 clips over HTTP, byte-compare | PASS |
 | runtime | 7 levels in a real browser, decode + console | PASS, 0 errors |
+| artifacts | non-audio build bytes vs main @45d389b | PASS, identical |
+| pixels | 7 level screenshots vs main @45d389b | PASS, identical |
+| CI | GitHub Actions on PR #4 | PASS |
 
 The test suite grew from the 214+ the brief cites to 304; the two audio-adjacent
 suites (`assets.test.ts` 18, `audio.test.ts` 62) both pass unchanged.
