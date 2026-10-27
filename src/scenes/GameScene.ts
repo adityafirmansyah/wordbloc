@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { AudioManager } from '../game/audio';
+import { AudioManager, audioKeysForLevel } from '../game/audio';
 import {
   levelManifest,
   loadLevel,
@@ -29,6 +29,7 @@ import {
   TRAY_GAP,
   TRAY_MAX_WIDTH,
   TRAY_ROW_GAP,
+  artHaloColor,
   chunkFrameFor,
   slotDoneFrameFor,
   slotFrameFor,
@@ -37,6 +38,7 @@ import {
   withinDropZone,
 } from '../game/theme';
 import type { Level, Mechanic } from '../game/levelTypes';
+import { makeArtView } from '../ui/artView';
 import { makeEdgeIconButton, makeText } from '../ui/kit';
 import { StageLayout } from '../ui/stage';
 
@@ -99,6 +101,8 @@ export class GameScene extends Phaser.Scene {
   private mutedLabel!: Phaser.GameObjects.Text;
   private solved = false;
   private wrongDrops = 0;
+  /** True once the level's word has actually been heard from its MP3. */
+  private introWordSpoken = false;
 
   constructor() {
     super(SCENES.game);
@@ -111,8 +115,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.audio = new AudioManager(this);
+    this.audio = new AudioManager();
     this.audio.setEnabled(this.registry.get('muted') !== true);
+    // Navigate away mid-clip and the word must stop: the pool is scene-scoped.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.release());
 
     // Full-bleed stage (camera zoom + centred content island). Everything below
     // anchors to the island centre; only the header controls and decorations hug
@@ -125,6 +131,7 @@ export class GameScene extends Phaser.Scene {
     this.dragging = null;
     this.solved = false;
     this.wrongDrops = 0;
+    this.introWordSpoken = false;
     this.board = null;
 
     // Unknown ids fall back to the first manifest entry, exactly as before, but
@@ -231,6 +238,11 @@ export class GameScene extends Phaser.Scene {
   private drawBoard(): void {
     this.filled = targetUnits(this.level).map(() => null);
 
+    // Start every clip this level needs BEFORE the first tile moves, so a
+    // placement speaks instantly instead of waiting on a fresh request. The
+    // explicit silent key is skipped inside audioKeysForLevel (no silent.mp3).
+    this.audio.preload(audioKeysForLevel(this.level));
+
     this.drawHeader();
     this.drawArt();
     this.drawHint();
@@ -242,8 +254,41 @@ export class GameScene extends Phaser.Scene {
     this.input.on(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
     this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onPointerUp, this);
 
-    // Phrase the word once the scene settles (audio may be blocked pre-gesture).
-    this.time.delayedCall(400, () => this.audio.playWord(this.level.audio_word));
+    // Autoplay policy: the audio context starts suspended and only a gesture can
+    // start it, so the first touch unlocks it. Without this the FIRST tile of a
+    // session is silent (the context is still 'suspended' when it plays).
+    this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.unlockAudio());
+
+    // Phrase the word once the scene settles. Pre-gesture this is usually blocked
+    // by the autoplay policy, which is why unlockAudio() re-speaks it.
+    this.introWordSpoken = false;
+    this.time.delayedCall(400, () => void this.speakIntroWord());
+  }
+
+  /**
+   * Unlocks the audio context from the first gesture, then re-speaks the level's
+   * word if the pre-gesture attempt was swallowed by the autoplay policy.
+   *
+   * Measured: a freshly created AudioContext is 'suspended' and its resume() stays
+   * PENDING without a gesture, so the "play the word as the board appears" line is
+   * genuinely inaudible on the first level. Replaying it here is what makes the
+   * spec's step 1 ("show illustration + play word audio") true for a real player.
+   */
+  private unlockAudio(): void {
+    void this.audio.unlock().then(() => {
+      if (!this.scene.isActive()) return;
+      // Unlocked: only replay if the arrival word never actually played.
+      if (!this.introWordSpoken) void this.speakIntroWord();
+    });
+  }
+
+  /** Speaks the level word once; records whether the FILE actually played. */
+  private speakIntroWord(): Promise<void> {
+    if (!this.level || this.introWordSpoken) return Promise.resolve();
+    return this.audio.playWord(this.level.audio_word).then((result) => {
+      // A policy-blocked first attempt must not consume the one replay.
+      if (result.outcome === 'file') this.introWordSpoken = true;
+    });
   }
 
   // ---------------------------------------------------------------- chrome
@@ -304,36 +349,64 @@ export class GameScene extends Phaser.Scene {
     this.mutedLabel.setVisible(next);
   }
 
-  /** Procedural "illustration" placeholder: a tinted card + category glyph. */
+  /**
+   * The word clue: the REAL 512x512 sticker from the art pack, on a soft halo so
+   * a transparent-background WebP still reads against the sky.
+   *
+   * The sticker loads asynchronously and the band is square (BANDS.artSize), so a
+   * slow file shows a tidy tinted disc instead of an empty gap — and a failed one
+   * keeps that disc plus the word's initial, which is the old placeholder. The
+   * initial is removed the moment the real texture lands, so the two never
+   * double-draw.
+   */
   private drawArt(): void {
-    const { width, height } = BANDS.artSize;
-    const card = this.add.image(ISLAND_CENTRE_X, BANDS.artCenterY, ATLAS_KEY, FRAMES.card);
-    card.setDisplaySize(width, height);
-    card.setDepth(1);
+    const { width } = BANDS.artSize;
+    // The level file's `image` ref is authoritative (it is what the pack was
+    // generated against); `imageKeyFor` is only for manifest-only surfaces.
+    const imageKey = this.level.image;
 
-    const glyph = this.add.graphics();
-    glyph.setDepth(2);
-    const palette = [0xffd9c7, 0xc7e9ff, 0xd8ffc7, 0xfff0c7, 0xe6ccff];
-    const seed = this.level.id.charCodeAt(this.level.id.length - 1) * 37;
-    glyph.fillStyle(palette[seed % palette.length] ?? 0xffd9c7, 1);
-    glyph.fillRoundedRect(
-      ISLAND_CENTRE_X - width / 2 + 10,
-      BANDS.artCenterY - height / 2 + 10,
-      width - 20,
-      height - 20,
-      18,
-    );
-    glyph.fillStyle(0xffffff, 0.9);
-    glyph.fillCircle(ISLAND_CENTRE_X, BANDS.artCenterY, 46);
-    this.add
+    // Halo: category-tinted disc, one colour family per category so a kid can
+    // start recognising that tigers and frogs live in the same world.
+    const halo = this.add.graphics().setDepth(1);
+    halo.fillStyle(artHaloColor(this.level.category), 1);
+    halo.fillCircle(ISLAND_CENTRE_X, BANDS.artCenterY, BANDS.artHaloRadius);
+    halo.lineStyle(6, 0xffffff, 0.85);
+    halo.strokeCircle(ISLAND_CENTRE_X, BANDS.artCenterY, BANDS.artHaloRadius);
+
+    // Fallback letter, visible only until (or unless) the sticker arrives.
+    const initial = this.add
       .text(ISLAND_CENTRE_X, BANDS.artCenterY, this.level.display.charAt(0).toUpperCase(), {
         fontFamily: FONT_FAMILY,
-        fontSize: '64px',
+        fontSize: '88px',
         color: '#21324a',
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
-      .setDepth(3);
+      .setDepth(2);
+
+    const { image, ready } = makeArtView(this, {
+      x: ISLAND_CENTRE_X,
+      y: BANDS.artCenterY,
+      size: width,
+      imageKey,
+      placeholderFrame: FRAMES.card,
+    });
+    // The sticker is the clue, so it sits ABOVE the fallback letter: a partly
+    // transparent sticker must never let the initial show through it.
+    image.setDepth(3);
+    // Hidden until the real texture lands; the halo + initial carry the band.
+    image.setVisible(false);
+
+    void ready.then((ok) => {
+      if (!this.scene.isActive()) return;
+      if (ok) {
+        image.setVisible(true);
+        initial.setVisible(false);
+      } else {
+        // No sticker: the tinted halo + big initial IS the clue (v1 behaviour).
+        console.warn(`WordBloc: illustration "${imageKey}" unavailable; drawing the initial.`);
+      }
+    });
   }
 
   private drawHint(): void {
@@ -628,7 +701,7 @@ export class GameScene extends Phaser.Scene {
 
     // PHONICS RULE: placing a tile speaks the PHONEME, never the letter name.
     const phonemeKey = targetUnits(this.level)[slot.index]?.phoneme ?? '';
-    this.audio.playPhoneme(phonemeKey);
+    void this.audio.playPhoneme(phonemeKey);
     this.popTile(slot);
 
     if (isPuzzleComplete(this.level, this.filled)) {

@@ -72,6 +72,37 @@ export const ISLAND_CENTRE_X = DESIGN_WIDTH / 2;
 export const ISLAND_CENTRE_Y = DESIGN_HEIGHT / 2;
 
 /**
+ * Halo colour behind a level's illustration, one family per level `category`.
+ *
+ * The sticker pack is transparent-background WebP, so the clue needs a backing
+ * plate to pop against the sky; keying it by category also gives the tiers a
+ * visual identity (animals warm, nature green, school blue, ...). Unknown
+ * categories fall back to the neutral panel tint rather than an arbitrary colour.
+ */
+export function artHaloColor(category: string): number {
+  switch (category) {
+    case 'animals':
+      return 0xffe0c9;
+    case 'food':
+      return 0xfff0c2;
+    case 'nature':
+      return 0xd8f5cf;
+    case 'home':
+      return 0xffe2ea;
+    case 'clothes':
+      return 0xe6e0ff;
+    case 'school':
+      return 0xd6ebff;
+    case 'transport':
+      return 0xd9f2f6;
+    case 'feelings':
+      return 0xffe9b8;
+    default:
+      return 0xeaf4fb;
+  }
+}
+
+/**
  * Narrowest live stage width (world px). Below this the fixed-width surfaces stop
  * fitting: the Wordbook panel is 980 wide with pager arrows at 76 / width-76
  * (needs >= 1264) and GameScene's tray wraps at TRAY_MAX_WIDTH = 1180. Pinning the
@@ -416,6 +447,71 @@ export function anchorX(stage: StageMetrics, anchor: StageAnchor): number {
 
 export const WORDBOOK_PER_PAGE = WORDBOOK.columns * WORDBOOK.rows;
 
+/**
+ * Card thumbnail geometry (design px) for the real illustration on each card.
+ *
+ * A card is 292x128. The sticker sits in a SQUARE well on the LEFT (the pack is
+ * 512x512 WebP): 96px with a 12px left margin, leaving 16px above and below, so
+ * the art reads as deliberately inset on all four sides.
+ *
+ * The rest is a text column between the well and the replay speaker, and the
+ * speaker moves to the BOTTOM-RIGHT corner. Column bounds:
+ *
+ *   well right edge        -38
+ *   speaker left edge       94   (x 116 - r 22)
+ *   gap                      8
+ *   => text column        -38 .. 86   (124px wide, centre 24)
+ *
+ * The column's right edge is DEFINED as the speaker's left edge minus the gap, so
+ * "text never overlaps the speaker" is true by construction rather than by
+ * estimating glyph widths:
+ *   - the word is centred in the column with a matching wordWrap width;
+ *   - the meta line is RIGHT-aligned to the column edge (long labels grow left).
+ *
+ * Rows: word y -24 (24-32px), meta y +26 (15px) — disjoint, and the word's band
+ * (-40..-8) clears the speaker vertically (12..56) as well.
+ * `tests/wordbookLayout.regression.test.ts` pins every one of these relations.
+ */
+export const WORDBOOK_THUMB = { size: 96, inset: 12 } as const;
+
+/** Card-relative x of the thumbnail centre (negative = left of the card centre). */
+export function wordbookThumbX(): number {
+  return -WORDBOOK.card.width / 2 + WORDBOOK_THUMB.inset + WORDBOOK_THUMB.size / 2;
+}
+
+/** Card-relative centre of the replay speaker (bottom-right corner). */
+export const WORDBOOK_SPEAKER = {
+  x: WORDBOOK.card.width / 2 - 30,
+  y: WORDBOOK.card.height / 2 - 30,
+  radius: 22,
+} as const;
+
+/** Gap between the text column and the speaker circle, design px. */
+export const WORDBOOK_TEXT_GAP = 8;
+
+/** Card-relative x where the text column starts (right edge of the thumb well). */
+export function wordbookTextLeft(): number {
+  return -WORDBOOK.card.width / 2 + WORDBOOK_THUMB.inset + WORDBOOK_THUMB.size;
+}
+
+/** Card-relative x where the text column ends (clear of the speaker circle). */
+export function wordbookTextRight(): number {
+  return WORDBOOK_SPEAKER.x - WORDBOOK_SPEAKER.radius - WORDBOOK_TEXT_GAP;
+}
+
+/** Width of the text column, used as the word label's wrap width. */
+export function wordbookTextWidth(): number {
+  return wordbookTextRight() - wordbookTextLeft();
+}
+
+/** Card-relative x centre of the word label. */
+export function wordbookWordX(): number {
+  return (wordbookTextLeft() + wordbookTextRight()) / 2;
+}
+
+/** Card-relative y of the word label / meta line. */
+export const WORDBOOK_CARD_TEXT = { wordY: -24, metaY: 26 } as const;
+
 /** Bottom edge of the last grid row, in design px. */
 export const WORDBOOK_GRID_BOTTOM =
   WORDBOOK.gridTop + WORDBOOK.rows * WORDBOOK.card.height + (WORDBOOK.rows - 1) * WORDBOOK.gapY;
@@ -442,8 +538,17 @@ export const CARD_SIZE = { width: 300, height: 180 } as const;
 export const BANDS = {
   headerCenterY: 76,
   headerButton: HEADER_BUTTON_SIZE.width,
-  artCenterY: 214,
-  artSize: { width: 300, height: 150 },
+  artCenterY: 210,
+  /**
+   * Clue band: SQUARE, because the real sticker pack is 512x512 transparent WebP.
+   * The band is bounded above by the header text block (its "Level N of M" line
+   * ends at y=114) and below by the mechanic line (top 318 - 26/2 = 305), so 180
+   * leaves 6px above and 5px below. `tests/layout.regression.test.ts` pins both
+   * edges so a later tweak cannot silently re-introduce an overlap.
+   */
+  artSize: { width: 180, height: 180 },
+  /** Soft disc painted BEHIND the sticker (radius, design px) so it pops on sky. */
+  artHaloRadius: 92,
   /** Mechanic instruction line ("Drag the letters"). */
   mechanicY: 318,
   /** Level hint / riddle line, one row below the instruction. */

@@ -129,8 +129,42 @@ Nothing else re-downloads, and no other file needs editing.
 - 30 seeded levels: 10 x T1, 8 x T2, 6 x T3, 3 x T4, 3 x T5.
 - Working drag-drop with magnetic snap on pointer + touch.
 - Wordbook screen listing unlocked words with replay audio.
-- Placeholder art (procedural Phaser Graphics shapes) — real art is a separate milestone.
-- Placeholder audio: silent/no-audio graceful degradation, never a crash if a key is missing.
+- Real 2D art (30 sticker WebPs) and recorded audio (30 word + 50 phoneme MP3s) ship
+  in `public/assets/`; see "Real Assets" below.
+
+## Real Assets (living section)
+
+Ruled after the art/audio milestone. The pack lives in `public/`, which Vite copies
+verbatim into `dist/`:
+
+```
+public/assets/
+  images/<category>/<word>.webp    30 stickers, 512x512, RGBA, <40 KB each
+  audio/words/<word>.mp3           30 word clips, -23 LUFS
+  audio/phonemes/<phoneme>.mp3     50 phoneme clips
+```
+
+- Level JSON keeps extension-free refs (`image: "animals/cat"`,
+  `audio_word: "words/cat"`, `audio_phonemes: ["phonemes/k", ...]`). `src/game/assets.ts`
+  is the ONLY place that turns a ref into a URL / texture key.
+- **Illustrations** load per level, on demand, deduped per scene (`src/game/art.ts`),
+  and register as `art/<ref>` in the texture cache so a sticker can never collide with
+  a generated UI-atlas frame. The clue band is SQUARE (`BANDS.artSize`) because the
+  pack is uniformly 512x512; a failed load falls back to a tinted halo + word initial.
+- **Audio** is Web Audio first: the clip is fetched + `decodeAudioData`d, then
+  `AudioBufferSourceNode.start()` is synchronous, so a tile placement speaks with no
+  buffering gap. `HTMLMediaElement` is the fallback where Web Audio is missing, and
+  Web Speech is used ONLY when the FILE failed to load (a 404 / undecodable bytes) —
+  never for an autoplay block, which is a policy state, not a broken file.
+- `phonemes/silent` deliberately has NO file: it must resolve to silence without a
+  network request (a 404 per silent letter was the risk).
+- Browsers start an `AudioContext` suspended until a user gesture. Scenes therefore
+  call `audio.unlock()` from their first pointerdown; `GameScene` re-speaks its arrival
+  word afterwards if the pre-gesture attempt was swallowed.
+- Every `play*` promise settles. Both `AudioContext.resume()` and a media element's
+  `play()` can stay pending forever (measured in headless Chrome), so both are
+  bounded by timeouts — a hang would otherwise freeze the caller.
+
 
 ## Scale / Viewport Model (living section)
 

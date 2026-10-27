@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { AudioManager } from '../game/audio';
+import { imageKeyFor } from '../game/assets';
 import { manifestCount, manifestEntryById, preloadLevel } from '../game/levels';
 import { wordbook, type WordbookEntry } from '../game/wordbook';
 import {
@@ -12,9 +13,17 @@ import {
   WORDBOOK,
   WORDBOOK_GRID_BOTTOM,
   WORDBOOK_PER_PAGE,
+  WORDBOOK_THUMB,
+  WORDBOOK_SPEAKER,
+  WORDBOOK_CARD_TEXT,
   wordbookColumnX,
   wordbookRowY,
+  wordbookThumbX,
+  wordbookWordX,
+  wordbookTextRight,
+  wordbookTextWidth,
 } from '../game/theme';
+import { makeArtView } from '../ui/artView';
 import { makeButton, makeEdgeIconButton, makeText } from '../ui/kit';
 import { StageLayout } from '../ui/stage';
 
@@ -47,8 +56,13 @@ export class WordbookScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.audio = new AudioManager(this);
+    this.audio = new AudioManager();
     this.audio.setEnabled(this.registry.get('muted') !== true);
+    // A replayed word must stop when the kid leaves the Wordbook.
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.release());
+    // Autoplay policy: only a gesture can start the audio context, and this scene
+    // is entered by tapping a button — the first tap on a card unlocks it.
+    this.input.once(Phaser.Input.Events.POINTER_DOWN, () => void this.audio.unlock());
     this.entries = wordbook().entries();
     this.page = 0;
 
@@ -153,33 +167,79 @@ export class WordbookScene extends Phaser.Scene {
       .setOrigin(0.5);
   }
 
+  /**
+   * One unlocked word: real sticker thumbnail + word + tier/category + replay.
+   *
+   * The thumbnail is the point of this screen — a kid who built "butterfly"
+   * recognises the picture before reading the word. It loads asynchronously and
+   * the card is tappable from the first frame: the art well shows the UI atlas
+   * card frame until (or unless) the WebP arrives.
+   */
   private drawCard(entry: WordbookEntry, x: number, y: number): void {
     const { width, height } = WORDBOOK.card;
     const bg = this.add.image(0, 0, ATLAS_KEY, FRAMES.card).setDisplaySize(width, height);
+
+    // Art well: a rounded white plate so the transparent sticker sits on a panel
+    // rather than directly on the card's own tint.
+    const wellX = wordbookThumbX();
+    const well = this.add
+      .image(wellX, 0, ATLAS_KEY, FRAMES.panel)
+      .setDisplaySize(WORDBOOK_THUMB.size, WORDBOOK_THUMB.size);
+    well.setTint(0xf2f8fc);
+
+    // `image` ref: the manifest row carries only category/display (schema 2 is
+    // frozen), so the derive rule is the documented contract — proven against
+    // every level file by `tests/assets.test.ts`.
+    const imageKey = imageKeyFor(entry.category, entry.display);
+    const thumb = makeArtView(this, {
+      x: wellX,
+      y: 0,
+      size: WORDBOOK_THUMB.size - 8,
+      imageKey,
+      placeholderFrame: FRAMES.dot,
+    });
+    // Until the sticker lands, hide it: the well alone reads as "art pending",
+    // whereas the dot placeholder looked like a deliberate lock badge.
+    thumb.image.setVisible(false);
+
+    const wordX = wordbookWordX();
     const word = this.add
-      .text(0, -20, entry.word, {
+      .text(wordX, WORDBOOK_CARD_TEXT.wordY, entry.display, {
         fontFamily: FONT_FAMILY,
-        fontSize: entry.word.length > 8 ? '30px' : '38px',
+        fontSize: entry.display.length > 8 ? '24px' : entry.display.length > 5 ? '28px' : '32px',
         color: '#21324a',
         fontStyle: 'bold',
+        align: 'center',
+        // Wrapped to the text column: the column's right edge is derived from the
+        // speaker circle, so a long word can never grow into the replay button.
+        wordWrap: { width: wordbookTextWidth(), useAdvancedWrap: true },
       })
       .setOrigin(0.5);
 
     // Manifest only: the card's tier/category metadata must not download a puzzle.
     const manifestEntry = manifestEntryById(entry.levelId);
+    const metaLabel = `Tier ${entry.tier}${manifestEntry ? ` · ${manifestEntry.category}` : ''}`;
     const meta = this.add
-      .text(0, 22, `Tier ${entry.tier}${manifestEntry ? ` · ${manifestEntry.category}` : ''}`, {
+      .text(wordbookTextRight(), WORDBOOK_CARD_TEXT.metaY, metaLabel, {
         fontFamily: FONT_FAMILY,
-        fontSize: '19px',
+        fontSize: '15px',
         color: '#7f95ab',
       })
-      .setOrigin(0.5);
+      // Right-aligned to the column edge: a longer category grows LEFT, away from
+      // the speaker that sits just beyond that edge.
+      .setOrigin(1, 0.5);
 
-    const speakerBg = this.add.circle(width / 2 - 34, -height / 2 + 30, 24, 0xeef6fd);
-    const speaker = this.add.image(width / 2 - 34, -height / 2 + 30, ATLAS_KEY, FRAMES.speaker);
-    speaker.setScale(0.36);
+    const speakerBg = this.add.circle(
+      WORDBOOK_SPEAKER.x,
+      WORDBOOK_SPEAKER.y,
+      WORDBOOK_SPEAKER.radius,
+      0xeef6fd,
+    );
+    const speaker = this.add
+      .image(WORDBOOK_SPEAKER.x, WORDBOOK_SPEAKER.y, ATLAS_KEY, FRAMES.speaker)
+      .setScale(0.32);
 
-    const card = this.add.container(x, y, [bg, word, meta, speakerBg, speaker]);
+    const card = this.add.container(x, y, [bg, well, thumb.image, word, meta, speakerBg, speaker]);
     card.setSize(width, height);
     // Whole card is a >=292x128 design px target (>=146x64 CSS at scale 0.5).
     // Rect starts at 0,0: Phaser adds displayOrigin before the Contains test.
@@ -194,12 +254,18 @@ export class WordbookScene extends Phaser.Scene {
       if (manifestEntry) void preloadLevel(manifestEntry.id);
     });
     card.on(Phaser.Input.Events.POINTER_UP, () => {
-      // Replay the word audio (phonics contract: whole word here, not phonemes).
-      this.audio.playWord(entry.audioWord);
-      this.tweens.add({ targets: speaker, scale: 0.5, duration: 110, yoyo: true });
+      // Replay the recorded word (phonics contract: whole word here, not phonemes).
+      void this.audio.playWord(entry.audioWord);
+      this.tweens.add({ targets: speaker, scale: 0.46, duration: 110, yoyo: true });
     });
 
     this.gridLayer.add(card);
+
+    // Reveal the thumbnail only once the card is in the layer: the page can be
+    // re-rendered (or the scene left) while the WebP is still in flight.
+    void thumb.ready.then((ok) => {
+      if (ok && card.active) thumb.image.setVisible(true);
+    });
   }
 
   private pages(): number {

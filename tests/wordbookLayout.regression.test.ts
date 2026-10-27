@@ -8,12 +8,20 @@ import {
   WORDBOOK_GRID_BOTTOM,
   WORDBOOK_GRID_WIDTH,
   WORDBOOK_PER_PAGE,
+  WORDBOOK_SPEAKER,
+  WORDBOOK_THUMB,
+  WORDBOOK_CARD_TEXT,
   anchorX,
   stageMetrics,
   wordbookBackX,
   wordbookColumnX,
   wordbookPagerX,
   wordbookRowY,
+  wordbookTextLeft,
+  wordbookTextRight,
+  wordbookTextWidth,
+  wordbookThumbX,
+  wordbookWordX,
 } from '../src/game/theme';
 
 /**
@@ -180,6 +188,89 @@ describe('Wordbook geometry — regression: row 3 collided with pager and Back',
   it('shows 9 cards per page (3x3), so 12 words fit on two pages without row 3 overflow', () => {
     expect(WORDBOOK_PER_PAGE).toBe(9);
     expect(WORDBOOK_PER_PAGE).toBe(WORDBOOK.columns * WORDBOOK.rows);
+  });
+});
+
+describe('Wordbook card — layout for the real illustration thumbnail', () => {
+  const halfW = WORDBOOK.card.width / 2;
+  const halfH = WORDBOOK.card.height / 2;
+
+  it('the thumbnail well fits inside the card on all four sides', () => {
+    const left = wordbookThumbX() - WORDBOOK_THUMB.size / 2;
+    const right = wordbookThumbX() + WORDBOOK_THUMB.size / 2;
+    const top = -WORDBOOK_THUMB.size / 2;
+    const bottom = WORDBOOK_THUMB.size / 2;
+
+    // A sticker touching (or crossing) a card edge would look like a mistake.
+    expect(left).toBeGreaterThan(-halfW);
+    expect(right).toBeLessThan(halfW);
+    expect(top).toBeGreaterThan(-halfH);
+    expect(bottom).toBeLessThan(halfH);
+
+    // The well is pinned to the card's left edge by `inset`, and the same margin
+    // appears above/below (16 = (128 - 96) / 2), so it reads as deliberately
+    // inset rather than floating.
+    expect(left - -halfW).toBeCloseTo(WORDBOOK_THUMB.inset, 6);
+    expect(halfH - bottom).toBeCloseTo((WORDBOOK.card.height - WORDBOOK_THUMB.size) / 2, 6);
+  });
+
+  it('the thumbnail is square (the sticker pack is 512x512)', () => {
+    // The pack is uniformly square, so a square well needs no cropping logic.
+    expect(WORDBOOK_THUMB.size).toBeGreaterThan(0);
+    expect(WORDBOOK_THUMB.size).toBeLessThanOrEqual(
+      WORDBOOK.card.height - 2 * WORDBOOK_THUMB.inset,
+    );
+  });
+
+  it('the text column is bounded by the thumbnail on the left and the speaker on the right', () => {
+    // The whole point: the right bound is DEFINED from the speaker, so text can
+    // never overlap the replay button no matter how long the word is.
+    expect(wordbookTextLeft()).toBeCloseTo(wordbookThumbX() + WORDBOOK_THUMB.size / 2, 6);
+    expect(wordbookTextRight()).toBeCloseTo(WORDBOOK_SPEAKER.x - WORDBOOK_SPEAKER.radius - 8, 6);
+    expect(wordbookTextWidth()).toBeGreaterThan(100);
+    expect(wordbookTextWidth()).toBeLessThanOrEqual(WORDBOOK.card.width - WORDBOOK_THUMB.size);
+  });
+
+  it('the word label is centred in the text column', () => {
+    const expected = (wordbookTextLeft() + wordbookTextRight()) / 2;
+    expect(wordbookWordX()).toBeCloseTo(expected, 6);
+    // ...and the column itself sits inside the card.
+    expect(wordbookTextLeft()).toBeGreaterThan(-halfW);
+    expect(wordbookTextRight()).toBeLessThan(halfW);
+  });
+
+  it('the replay speaker sits inside the card', () => {
+    const { x, y, radius } = WORDBOOK_SPEAKER;
+    expect(x + radius).toBeLessThanOrEqual(halfW);
+    expect(x - radius).toBeGreaterThan(-halfW);
+    expect(y + radius).toBeLessThanOrEqual(halfH);
+    expect(y - radius).toBeGreaterThan(-halfH);
+    // Bottom-right corner: below the card's midline, right of the text column.
+    expect(y).toBeGreaterThan(0);
+    expect(x).toBeGreaterThan(wordbookTextRight());
+  });
+
+  it('a 9-letter word cannot reach the speaker icon', () => {
+    // "butterfly" is the longest real display (9 chars). The label is wrapped to
+    // the column width, and the column right edge stops 8px short of the speaker
+    // circle, so the clearance is structural — not a glyph-width estimate.
+    expect(wordbookTextWidth()).toBeGreaterThanOrEqual(9 * 8);
+    expect(wordbookTextRight()).toBeLessThan(WORDBOOK_SPEAKER.x - WORDBOOK_SPEAKER.radius);
+  });
+
+  it('the word and meta rows never overlap, and the word clears the speaker vertically', () => {
+    const { wordY, metaY } = WORDBOOK_CARD_TEXT;
+    // 32px bold word bottom vs 15px meta top.
+    expect(wordY + 32 / 2).toBeLessThan(metaY - 15 / 2);
+    // The meta row shares the speaker's row vertically, so its right edge (the
+    // column bound) is what keeps them apart.
+    expect(metaY + 15 / 2).toBeLessThanOrEqual(halfH);
+    expect(WORDBOOK_SPEAKER.y - WORDBOOK_SPEAKER.radius).toBeLessThan(metaY + 15 / 2);
+  });
+
+  it('the speaker never overlaps the thumbnail well', () => {
+    const wellRight = wordbookThumbX() + WORDBOOK_THUMB.size / 2;
+    expect(WORDBOOK_SPEAKER.x - WORDBOOK_SPEAKER.radius).toBeGreaterThan(wellRight);
   });
 });
 

@@ -8,10 +8,38 @@ Web-first (Phaser 3 + Vite + TypeScript), portabel ke Android (Capacitor) dan Wi
 
 - [x] Spec frozen — `docs/SPEC.md`
 - [x] v1 scaffold + core loop (this milestone)
-- [ ] Real 2D art pass
-- [ ] Native audio pass (phonemes + words)
+- [x] Real 2D art pass — 30 WebP stickers in `public/assets/images/`
+- [x] Native audio pass — 30 word + 50 phoneme MP3s in `public/assets/audio/`
 - [ ] Capacitor Android wrapper
 - [ ] Tauri Windows build
+
+## Assets
+
+The real asset pack lives in `public/`, so Vite copies it verbatim into `dist/`:
+
+```
+public/assets/
+  images/<category>/<word>.webp    30 stickers, 512x512, transparent, <40 KB each
+  audio/words/<word>.mp3           30 word clips, -23 LUFS normalised
+  audio/phonemes/<phoneme>.mp3     50 phoneme clips (letter SOUND, not letter name)
+```
+
+Total payload is 1.9 MB. Source refs in the level JSON stay extension-free
+(`"image": "animals/cat"`, `"audio_word": "words/cat"`) — `src/game/assets.ts` is the
+single place that maps them to URLs (`imageUrl`, `audioUrl`, `textureKey`), so the pack
+can be re-nested or moved behind a CDN by editing one file.
+
+Loading rules:
+
+- Illustrations load on demand, one file per level, deduped per scene
+  (`src/game/art.ts`). A failed sticker keeps the tinted halo + word initial, so a
+  broken image can never take a level down.
+- Audio is Web Audio first (decode once, then `source.start()` is synchronous, so a
+  tile speaks with no buffering gap), an `HTMLAudioElement` where Web Audio is
+  missing, and Web Speech ONLY when the file itself failed. `phonemes/silent` has no
+  file on purpose: it resolves to silence without a network request.
+- Scenes call `audio.unlock()` from their first pointerdown, because browsers start an
+  `AudioContext` suspended until a gesture.
 
 ## Dev
 

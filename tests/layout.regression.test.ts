@@ -53,6 +53,42 @@ describe('game bands — regression: hint text overlapped the mechanic label', (
     expect(BANDS.mechanicY - 14).toBeGreaterThan(artBottom);
   });
 
+  it('the art band clears the header text block above it', () => {
+    // Header rows: tier label at headerCenterY-14 (30px) and "Level N of M" at
+    // headerCenterY+26 (24px). The lowest glyph box is 76+26+12 = 114.
+    const headerBottom = BANDS.headerCenterY + 26 + 24 / 2;
+    const artTop = BANDS.artCenterY - BANDS.artSize.height / 2;
+    expect(artTop).toBeGreaterThan(headerBottom);
+  });
+
+  it('the art band is square (the sticker pack is 512x512)', () => {
+    // A non-square band would letterbox every sticker with transparent margins or
+    // stretch it — the pack is uniformly square since the real assets landed.
+    expect(BANDS.artSize.width).toBe(BANDS.artSize.height);
+    expect(BANDS.artSize.width).toBe(180);
+  });
+
+  it('the halo disc encloses the sticker without crossing the mechanic line', () => {
+    // Halo must be big enough to be a backdrop for the sticker...
+    expect(BANDS.artHaloRadius * 2).toBeGreaterThanOrEqual(BANDS.artSize.width);
+    // ...and must not overflow the band into the header text or the instruction.
+    const headerBottom = BANDS.headerCenterY + 26 + 24 / 2;
+    const haloTop = BANDS.artCenterY - BANDS.artHaloRadius;
+    const haloBottom = BANDS.artCenterY + BANDS.artHaloRadius;
+    expect(haloTop).toBeGreaterThan(headerBottom);
+    expect(haloBottom).toBeLessThan(BANDS.mechanicY - 26 / 2);
+  });
+
+  it('the sticker stays centred on the content island (crisp, not cropped)', () => {
+    // Centred on the island: the camera keeps the island centred, so the clue is
+    // always in the middle of whatever viewport the kid is on.
+    expect(ISLAND_CENTRE_X).toBe(DESIGN_WIDTH / 2);
+    const artLeft = ISLAND_CENTRE_X - BANDS.artSize.width / 2;
+    const artRight = ISLAND_CENTRE_X + BANDS.artSize.width / 2;
+    expect(artLeft).toBeGreaterThan(0);
+    expect(artRight).toBeLessThan(DESIGN_WIDTH);
+  });
+
   it('the slot row clears the hint', () => {
     const slotsTop = BANDS.slotsCenterY - TILE_HEIGHT / 2;
     expect(slotsTop).toBeGreaterThan(BANDS.hintY);
