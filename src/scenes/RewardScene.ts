@@ -41,8 +41,9 @@ export class RewardScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.audio = new AudioManager(this);
+    this.audio = new AudioManager();
     this.audio.setEnabled(this.registry.get('muted') !== true);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.release());
 
     // The manifest row is instant; it carries the word/audio the screen needs.
     const entry = manifestEntryById(this.levelId);
@@ -92,9 +93,25 @@ export class RewardScene extends Phaser.Scene {
     this.drawActions();
     this.confetti();
 
-    // Replay the finished word shortly after arrival.
+    // Replay the finished word shortly after arrival. The scene was entered from
+    // the solved board, so a gesture has already happened — but the context may
+    // still be suspended on a cold session, so this retries once it is unlocked.
     const audioKey = level?.audio_word ?? `words/${entry.display}`;
-    this.time.delayedCall(300, () => this.audio.playWord(audioKey));
+    this.time.delayedCall(300, () => void this.replayWord(audioKey));
+  }
+
+  /**
+   * Speaks the finished word, retrying after an unlock if the autoplay policy
+   * swallowed the first attempt (result.outcome 'silent' for a policy block, never
+   * 'file'). A broken file reports 'speech'/'silent' through the manager's own
+   * fallback and is not retried here.
+   */
+  private async replayWord(audioKey: string): Promise<void> {
+    const first = await this.audio.playWord(audioKey);
+    if (first.outcome !== 'silent' || !this.scene.isActive()) return;
+    await this.audio.unlock();
+    if (!this.scene.isActive()) return;
+    await this.audio.playWord(audioKey);
   }
 
   private drawBackdrop(): void {
