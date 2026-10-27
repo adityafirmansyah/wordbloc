@@ -106,20 +106,19 @@ them from this measurement.
 
 ## ASR cross-check (and why it is not the pass bar)
 
-`hat` transcribes as "Ha!" under `small.en` and `medium.en`. That is the same
-isolated-short-word artifact that the **accepted** pack already has — under
-`medium.en` the shipped child clips read `cup`→"Come", `pig`→"P", `sun`→"SON",
-`bed`→"Ben". The shipped pack's own transcript pass rate is 20/23, so ASR
-exact-match is not a bar this pack was ever built to. What was checked instead:
+`hat` transcribes as "Ha!" under `small.en` and `medium.en` — the same
+isolated-short-word artifact the **accepted** pack already has (`cup`→"Come",
+`pig`→"P", `sun`→"SON", `bed`→"Ben"; the shipped pack's transcript pass rate is
+20/23). What was verified instead: **zero profanity and zero letter-name readings**
+across the new takes — the exact failure that forced the adult voice originally.
+`hat`'s consonant is independently proven present by the burst test.
 
-- **zero profanity and zero letter-name readings** across the 7 new takes — the
-  specific failure that forced the adult voice in the first place (Ana's `frog`
-  previously read as profanity). Count: **0**.
 - under `small.en`, 5 of the 7 transcribe to the exact word (`dog`, `frog`, `map`,
-  `unhappy`, `rewrite`); the 2 misses are `hat` ("Ha!") and `snake` ("SNA-"), and
-  `hat`'s consonant is independently proven present by the burst test above.
-- `medium.en` was run as the stronger check and agreed on every word it reached
-  (`dog` exact, `frog` exact, `hat` "Ha!") before the run was cut for time.
+  `unhappy`, `rewrite`); the 2 misses are `hat` ("Ha!") and `snake` ("SNA-").
+- under `medium.en` the stronger model reads **6/7 exactly** (`dog`, `frog`, `map`,
+  `snake`, `unhappy`, `rewrite`); the sole miss is `hat` → "Ha!", and `hat`'s
+  consonant is independently proven present by the burst test above (+5.2 dB over
+  its own no-stop control, with a 0.053 closure dip and 9.2x HF tilt at the end).
 
 ## Browser evidence
 
