@@ -97,12 +97,68 @@ instruction, hint, slots and tray all remain clear of each other.
 Riddle line ("Riddle: to write it again. Put a prefix before WRITE.") fits on one
 row above the slots; the `school/rewrite` sticker renders crisply.
 
+### 09 — SNAKE: 5 slots with a silent final letter
+`09-snake-silent-letter.png` · viewport 1280x720
+
+`audio_phonemes: ["phonemes/s", "phonemes/n", "phonemes/ae", "phonemes/k", "phonemes/silent"]`
+→ pooled clips `[words/snake, phonemes/s, phonemes/n, phonemes/ae, phonemes/k]` (four,
+not five: the silent marker is excluded). With `fetch` instrumented, replaying the
+silent slot produced:
+
+```
+result:  { key: 'phonemes/silent', outcome: 'silent', url: '' }
+fetchLog: []        <- ZERO network requests
+failed:  false      <- not treated as a missing file
+```
+
+That is the "no 404 for a silent letter" requirement, measured rather than asserted.
+
+
 ### 04 — Reward: word audio replay
 `04-reward-word-audio.png` · viewport 1280x720 (at 1280x577 during capture)
 
 Star, "You built \"cat\"", wordbook count, Next/Replay/Wordbook. The Next button
 overlapping the panel's bottom edge is PRE-EXISTING (same in
 `docs/evidence/evidence-reward.png` from main) and out of scope for this task.
+
+## All 30 levels swept on the production build
+
+Every level was opened in turn and checked against its own level file. For all 30:
+exactly one `art/<ref>` texture present and `visible: true` at 180x180, and every
+expected clip (word + each distinct non-silent phoneme) pooled with zero failures.
+
+```
+OK lvl_0001 CAT      letter_drag  art=True [180,180] clips=4/4
+OK lvl_0002 DOG      letter_drag  art=True [180,180] clips=4/4
+OK lvl_0003 SUN      letter_drag  art=True [180,180] clips=4/4
+OK lvl_0004 BED      letter_drag  art=True [180,180] clips=4/4
+OK lvl_0005 PIG      letter_drag  art=True [180,180] clips=4/4
+OK lvl_0006 CUP      letter_drag  art=True [180,180] clips=4/4
+OK lvl_0007 HAT      letter_drag  art=True [180,180] clips=4/4
+OK lvl_0008 MAP      letter_drag  art=True [180,180] clips=4/4
+OK lvl_0009 FROG     letter_drag  art=True [180,180] clips=5/5
+OK lvl_0010 FISH     letter_drag  art=True [180,180] clips=4/4
+OK lvl_0011 TIGER    letter_drag  art=True [180,180] clips=5/5
+OK lvl_0012 APPLE    letter_drag  art=True [180,180] clips=4/4
+OK lvl_0013 HOUSE    letter_drag  art=True [180,180] clips=4/4
+OK lvl_0014 WATER    letter_drag  art=True [180,180] clips=5/5
+OK lvl_0015 SNAKE    letter_drag  art=True [180,180] clips=5/5
+OK lvl_0016 MOUSE    letter_drag  art=True [180,180] clips=4/4
+OK lvl_0017 TRAIN    letter_drag  art=True [180,180] clips=5/5
+OK lvl_0018 LEMON    letter_drag  art=True [180,180] clips=6/6
+OK lvl_0019 BUTTERFLY syllable_tap art=True [180,180] clips=4/4
+OK lvl_0020 ELEPHANT  syllable_tap art=True [180,180] clips=4/4
+OK lvl_0021 PENCIL    syllable_tap art=True [180,180] clips=3/3
+OK lvl_0022 RABBIT    syllable_tap art=True [180,180] clips=3/3
+OK lvl_0023 UMBRELLA  syllable_tap art=True [180,180] clips=4/4
+OK lvl_0024 BANANA    syllable_tap art=True [180,180] clips=3/3
+OK lvl_0025 SUNFLOWER compound    art=True [180,180] clips=3/3
+OK lvl_0026 RAINBOW   compound     art=True [180,180] clips=3/3
+OK lvl_0027 PANCAKE   compound     art=True [180,180] clips=3/3
+OK lvl_0028 UNHAPPY   affix        art=True [180,180] clips=3/3
+OK lvl_0029 REWRITE   affix        art=True [180,180] clips=3/3
+OK lvl_0030 PLAYFUL   affix        art=True [180,180] clips=3/3
+```
 
 ## Console cleanliness
 
