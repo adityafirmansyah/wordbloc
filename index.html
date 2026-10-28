@@ -72,10 +72,12 @@
         display: block;
       }
       /*
-       * Viewport gate. Below Scale.FIT factor 0.5 the tiles would render smaller
-       * than the spec's 64x64 CSS px touch-target floor, so the playable stage is
-       * replaced by a readable instruction instead (portrait phone -> rotate,
-       * tiny window -> enlarge). See src/ui/viewportGate.ts.
+       * Viewport gate. Below stage scale 0.36 the tiles would render smaller than the
+       * 44 CSS px accessibility floor, so the playable stage is replaced by a readable
+       * instruction instead (portrait phone -> rotate, tiny window -> enlarge). That
+       * floor is vh >= 260 CSS px, which a real phone in landscape reaches once
+       * Chrome/Safari has taken its ~94 CSS px of browser chrome. See
+       * src/ui/viewportGate.ts.
        */
       #viewport-notice {
         display: none;
@@ -119,6 +121,33 @@
         line-height: 1.45;
         color: #33506b;
       }
+      /*
+       * "Go fullscreen" — the one action a phone player can take that REMOVES the
+       * ~94 CSS px of browser chrome the notice is complaining about, which usually
+       * lifts the viewport back above the 260px floor. Hidden (attribute `hidden`)
+       * wherever the Fullscreen API is unavailable, so it never promises something
+       * the browser will not do. 48 CSS px tall: above the 44 floor itself.
+       */
+      #viewport-notice-fullscreen {
+        appearance: none;
+        border: 4px solid #c24848;
+        border-radius: 18px;
+        background: #ff6b6b;
+        color: #ffffff;
+        font: inherit;
+        font-size: 19px;
+        font-weight: bold;
+        padding: 0 28px;
+        min-height: 56px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      #viewport-notice-fullscreen:active {
+        transform: translateY(2px);
+      }
+      #viewport-notice-fullscreen[hidden] {
+        display: none;
+      }
       html.viewport-blocked #game {
         visibility: hidden;
       }
@@ -130,9 +159,9 @@
       <div class="notice-icon" aria-hidden="true">&#8635;</div>
       <h1 data-notice-title>Turn your device sideways</h1>
       <p data-notice-body>
-        WordBloc plays best in landscape. Make the window at least 360px tall (or 640px wide on a
-        squarer screen) so the letter tiles stay big enough to tap.
+        WordBloc plays best in landscape. Rotate the tablet or phone, then carry on.
       </p>
+      <button id="viewport-notice-fullscreen" type="button" hidden>Go fullscreen</button>
     </div>
     <pre id="boot-failure" role="alert"></pre>
     <script type="module" src="/src/main.ts"></script>
