@@ -1,0 +1,67 @@
+{
+  "sfx": [
+    {
+      "t": 3435,
+      "key": "sfx/click"
+    },
+    {
+      "t": 5238,
+      "key": "sfx/bounce"
+    },
+    {
+      "t": 7607,
+      "key": "sfx/snap"
+    },
+    {
+      "t": 9354,
+      "key": "sfx/snap"
+    },
+    {
+      "t": 10999,
+      "key": "sfx/snap"
+    },
+    {
+      "t": 10999,
+      "key": "sfx/chime"
+    },
+    {
+      "t": 12381,
+      "key": "sfx/star"
+    }
+  ],
+  "starts": [
+    3575,
+    4222,
+    5238,
+    7608,
+    7608,
+    9354,
+    9355,
+    11000,
+    11000,
+    11000,
+    11000,
+    12668,
+    13019
+  ],
+  "errors": [],
+  "fetches": [
+    "assets/audio/sfx/snap.mp3",
+    "assets/audio/sfx/bounce.mp3",
+    "assets/audio/sfx/chime.mp3",
+    "assets/audio/sfx/star.mp3",
+    "assets/audio/sfx/click.mp3",
+    "assets/audio/words/sun.mp3",
+    "assets/audio/phonemes/s.mp3",
+    "assets/audio/phonemes/u.mp3",
+    "assets/audio/phonemes/n.mp3",
+    "assets/audio/sfx/snap.mp3",
+    "assets/audio/sfx/bounce.mp3",
+    "assets/audio/sfx/chime.mp3",
+    "assets/audio/sfx/star.mp3",
+    "assets/audio/sfx/click.mp3",
+    "assets/audio/words/sun.mp3"
+  ],
+  "speech": 0,
+  "level": "{\"id\":\"lvl_0003\",\"word\":\"SUN\"}"
+}

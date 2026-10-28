@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { resumeLevelId } from '../game/progress';
 import { wordbook } from '../game/wordbook';
+import { AudioManager, type SfxKey } from '../game/audio';
 import {
   ATLAS_KEY,
   BANDS,
@@ -16,12 +17,27 @@ import { StageLayout } from '../ui/stage';
 /** Title screen: Play, Wordbook, and a small progress readout. */
 export class MenuScene extends Phaser.Scene {
   private layout!: StageLayout;
+  private audio!: AudioManager;
 
   constructor() {
     super(SCENES.menu);
   }
 
+  /** Game-juice click for this scene's buttons; reads the live manager. */
+  private clickSfx = (key: SfxKey): void => {
+    void this.audio.playSfx(key).catch(() => undefined);
+  };
+
   create(): void {
+    // The title screen is the FIRST gesture of a session, so it is also where the
+    // audio context gets unlocked: without that, the Play tap is inaudible and the
+    // first tile of the level after it stays silent too.
+    this.audio = new AudioManager();
+    this.audio.setEnabled(this.registry.get('muted') !== true);
+    this.audio.preloadSfx();
+    this.input.once(Phaser.Input.Events.POINTER_DOWN, () => void this.audio.unlock());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.release());
+
     // Stage first: it paints the full-bleed backdrop and keeps the camera centred
     // on the 1280x720 content island on any viewport aspect ratio.
     this.layout = new StageLayout(this, { hills: true });
@@ -45,6 +61,7 @@ export class MenuScene extends Phaser.Scene {
       label: 'Play',
       onClick: () => this.startGame(),
       variant: 'primary',
+      sfx: this.clickSfx,
     });
 
     makeButton(this, {
@@ -53,6 +70,7 @@ export class MenuScene extends Phaser.Scene {
       label: `Wordbook (${book.count()})`,
       onClick: () => this.scene.start(SCENES.wordbook),
       variant: 'alt',
+      sfx: this.clickSfx,
     });
 
     const stars = this.add.container(0, 92, [
@@ -69,6 +87,8 @@ export class MenuScene extends Phaser.Scene {
       inset: 92,
       y: BANDS.headerCenterY,
       frame: FRAMES.speaker,
+      // No click SFX on purpose: this handler RESTARTS the scene, whose shutdown
+      // releases the audio pool and would truncate the click it just started.
       onClick: (): void => {
         const next = !(this.registry.get('muted') === true);
         this.registry.set('muted', next);

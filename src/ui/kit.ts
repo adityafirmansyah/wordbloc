@@ -1,6 +1,17 @@
 import Phaser from 'phaser';
 import { ATLAS_KEY, BANDS, BUTTON_SIZE, FONT_FAMILY, FRAMES } from '../game/theme';
+import type { SfxKey } from '../game/audio';
 import type { StageLayout } from './stage';
+
+/**
+ * Callback a scene hands to its buttons so a press makes a soft bubble click.
+ *
+ * Passed in explicitly (rather than read from a module singleton) so a button can
+ * only ever click through the audio manager of the scene that built it — a
+ * released manager leaves the last scene's buttons silent instead of throwing.
+ * Buttons built without it stay silent, as they were before SFX existed.
+ */
+export type SfxPlayer = (key: SfxKey) => void;
 
 export interface ButtonOptions {
   x: number;
@@ -11,7 +22,12 @@ export interface ButtonOptions {
   width?: number;
   height?: number;
   fontSize?: number;
+  /** Optional game-juice click; omitted by buttons that should stay silent. */
+  sfx?: SfxPlayer;
 }
+
+/** The clip a button press plays. One place, so the whole kit sounds the same. */
+const PRESS_SFX: SfxKey = 'sfx/click';
 
 /** Chunky tappable button backed by atlas frames. >=128x128 design px by default. */
 export function makeButton(scene: Phaser.Scene, opts: ButtonOptions): Phaser.GameObjects.Container {
@@ -57,6 +73,9 @@ export function makeButton(scene: Phaser.Scene, opts: ButtonOptions): Phaser.Gam
   container.on(Phaser.Input.Events.POINTER_OUT, release);
   container.on(Phaser.Input.Events.POINTER_UP, () => {
     release();
+    // Click before the action: the action usually starts a scene, whose shutdown
+    // releases the audio pool — a click started after it would be cut off.
+    opts.sfx?.(PRESS_SFX);
     opts.onClick();
   });
 
@@ -70,6 +89,8 @@ export interface IconButtonOptions {
   onClick: () => void;
   size?: number;
   label?: string;
+  /** Optional game-juice click; omitted by icon buttons that should stay silent. */
+  sfx?: SfxPlayer;
 }
 
 /** Square icon button (>=128x128 design px => 64x64 CSS at scale 0.5). */
@@ -105,6 +126,8 @@ export function makeIconButton(
     bg.setFrame(FRAMES.btnSq);
     bg.setDisplaySize(size, size);
     container.setY(opts.y);
+    // Click before the action: the action usually starts a scene.
+    opts.sfx?.(PRESS_SFX);
     opts.onClick();
   });
 
@@ -145,6 +168,7 @@ export function makeEdgeIconButton(
     frame: string;
     onClick: () => void;
     size?: number;
+    sfx?: SfxPlayer;
   },
 ): Phaser.GameObjects.Container {
   const button = makeIconButton(scene, {
@@ -153,6 +177,7 @@ export function makeEdgeIconButton(
     frame: opts.frame,
     onClick: opts.onClick,
     size: opts.size,
+    sfx: opts.sfx,
   });
   return layout.attach(button, { kind: opts.edge, inset: opts.inset });
 }
