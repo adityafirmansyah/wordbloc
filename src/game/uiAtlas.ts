@@ -27,6 +27,35 @@ const TILE_H = BANDS.slotHeight;
 
 const FACE = 0xffffff;
 
+/**
+ * Drop-shadow offset for a tile frame, in design px (down-right).
+ *
+ * The tile body is inset by exactly this much so that BOTH the body and the
+ * shadow fit inside the frame rectangle declared to the texture atlas:
+ *
+ *     body   (0, 0, w - dx, h - dy)      -> right/bottom edge at w-dx / h-dy
+ *     shadow (dx, dy, w - dx, h - dy)    -> right/bottom edge at w    / h
+ *
+ * Drawing past `w`/`h` is what produced the visible glitches, because the atlas
+ * packs frames edge to edge and the renderer clips at the frame bounds:
+ *   - a shadow that overflowed the frame bled into whatever frame sat below it
+ *     (the top-left "protrusion" on Menu's Play button was the previous frame's
+ *     shadow showing through its rounded corner), and
+ *   - a shadow taller than the frame was sliced flat at the bottom instead of
+ *     ending in the rounded corner it was drawn with.
+ * `tests/uiAtlas.regression.test.ts` pins "nothing is drawn outside its frame"
+ * for every spec, so this cannot regress silently again.
+ */
+const TILE_SHADOW_DX = 4;
+const TILE_SHADOW_DY = 6;
+
+/**
+ * Gutter around every packed frame. Also absorbs GPU bilinear filtering
+ * (half a texel each side) and any devicePixelRatio rounding, so a frame can
+ * never sample its neighbour even when it is drawn scaled.
+ */
+export const ATLAS_PADDING = 16;
+
 function roundRect(
   g: Phaser.GameObjects.Graphics,
   x: number,
@@ -52,18 +81,25 @@ export function makeTileFrameSpec(
     height,
     draw: (g, w, h) => {
       const r = Math.min(28, h * 0.22);
-      // drop shadow
+      // Body + shadow are BOTH inset by the shadow offset so nothing is drawn
+      // past (w, h): the shadow's bottom-right edge lands exactly on the frame
+      // edge and is never clipped into a flat cut, and it cannot bleed into the
+      // next packed frame.
+      const bodyW = w - TILE_SHADOW_DX;
+      const bodyH = h - TILE_SHADOW_DY;
+      // drop shadow (down-right)
       g.fillStyle(0x000000, 0.14);
-      roundRect(g, 5, 8, w, h, r);
+      roundRect(g, TILE_SHADOW_DX, TILE_SHADOW_DY, bodyW, bodyH, r);
       // body
       g.fillStyle(c.face, 1);
-      roundRect(g, 0, 0, w, h, r);
+      roundRect(g, 0, 0, bodyW, bodyH, r);
       // top highlight band
       g.fillStyle(c.shine, 1);
-      roundRect(g, 10, 10, w - 20, h * 0.34, r * 0.7);
-      // inner border
+      roundRect(g, 10, 10, bodyW - 20, bodyH * 0.34, r * 0.7);
+      // inner border, inset 2px from the body edge (the 4px stroke straddles the
+      // path by 2px, so the path stops 2px short of `bodyW`/`bodyH`)
       g.lineStyle(4, c.edge, 1);
-      g.strokeRoundedRect(2, 2, w - 4, h - 4, r);
+      g.strokeRoundedRect(2, 2, bodyW - 4, bodyH - 4, r);
     },
   };
 }
@@ -104,14 +140,21 @@ export function makeButtonFrameSpec(
     height,
     draw: (g, w, h) => {
       const r = 30;
+      // The face is `faceH` tall starting at y = 0; the shadow is the SAME height
+      // starting at y = 8, so it ends exactly at y = h.
+      //
+      // It used to be drawn `h` tall from y = 8 (ending at h + 8), i.e. 8px past
+      // the frame. The atlas clips at the frame boundary, so the bottom of every
+      // button shadow was sliced flat instead of keeping its rounded corners.
+      const faceH = pressed ? h - 6 : h - 8;
       if (!pressed) {
         g.fillStyle(0x000000, 0.16);
-        roundRect(g, 0, 8, w, h, r);
+        roundRect(g, 0, 8, w, faceH, r);
       }
       g.fillStyle(face, 1);
-      roundRect(g, 0, 0, w, pressed ? h - 6 : h - 8, r);
+      roundRect(g, 0, 0, w, faceH, r);
       g.lineStyle(4, edge, 1);
-      g.strokeRoundedRect(2, 2, w - 4, (pressed ? h - 6 : h - 8) - 4, r);
+      g.strokeRoundedRect(2, 2, w - 4, faceH - 4, r);
     },
   };
 }
@@ -301,7 +344,12 @@ function makeBgStripSpec(width: number, height: number): FrameSpec {
         const t = i / (steps - 1);
         const c = Phaser.Display.Color.Interpolate.ColorWithColor(top, bottom, 1, t);
         g.fillStyle(Phaser.Display.Color.GetColor(c.r, c.g, c.b), 1);
-        g.fillRect(0, i * bandH, w, Math.ceil(bandH) + 1);
+        // +1px overlaps the next band so no seam shows, but the LAST band is
+        // clamped to the frame edge: overhanging it by a pixel let the strip
+        // paint into the frame packed below it.
+        const y = i * bandH;
+        const bandHeight = Math.min(h - y, Math.ceil(bandH) + 1);
+        g.fillRect(0, y, w, bandHeight);
       }
     },
   };
@@ -459,7 +507,7 @@ export function buildUiAtlas(scene: Phaser.Scene, maxWidth = 2048): Phaser.Textu
   }
 
   const specs = buildFrameSpecs();
-  const packed = packFrames(specs, maxWidth, 2);
+  const packed = packFrames(specs, maxWidth, ATLAS_PADDING);
 
   const rt = scene.make.renderTexture({ width: packed.width, height: packed.height }, false);
   rt.setOrigin(0, 0);
