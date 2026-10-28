@@ -10,15 +10,18 @@ import {
   FRAMES,
   PORTRAIT_WORDBOOK,
   PORTRAIT_WORDBOOK_PER_PAGE,
+  PORTRAIT_WORDBOOK_TEXT,
+  PORTRAIT_WORDBOOK_THUMB,
   SCENES,
   WORDBOOK,
   WORDBOOK_GRID_BOTTOM,
   WORDBOOK_PER_PAGE,
   WORDBOOK_THUMB,
-  WORDBOOK_SPEAKER,
   WORDBOOK_CARD_TEXT,
+  wordbookCardSize,
   wordbookColumnX,
   wordbookRowY,
+  wordbookSpeaker,
   wordbookThumbX,
   wordbookWordX,
   wordbookTextRight,
@@ -224,56 +227,75 @@ export class WordbookScene extends Phaser.Scene {
   }
 
   private drawCard(entry: WordbookEntry, x: number, y: number): void {
-    const { width, height } = WORDBOOK.card;
+    const isPortrait = this.layout.metrics.isPortrait;
+    const { width, height } = wordbookCardSize(isPortrait);
     const bg = this.add.image(0, 0, ATLAS_KEY, FRAMES.card).setDisplaySize(width, height);
 
-    const wellX = wordbookThumbX();
+    const thumbSize = isPortrait ? PORTRAIT_WORDBOOK_THUMB.size : WORDBOOK_THUMB.size;
+    const wellX = wordbookThumbX(isPortrait);
     const well = this.add
       .image(wellX, 0, ATLAS_KEY, FRAMES.panel)
-      .setDisplaySize(WORDBOOK_THUMB.size, WORDBOOK_THUMB.size);
+      .setDisplaySize(thumbSize, thumbSize);
     well.setTint(0xf2f8fc);
 
     const imageKey = imageKeyFor(entry.category, entry.display);
     const thumb = makeArtView(this, {
       x: wellX,
       y: 0,
-      size: WORDBOOK_THUMB.size - 8,
+      size: thumbSize - 8,
       imageKey,
       placeholderFrame: FRAMES.dot,
     });
     thumb.image.setVisible(false);
 
-    const wordX = wordbookWordX();
+    const wordX = wordbookWordX(isPortrait);
+    const wordY = isPortrait ? PORTRAIT_WORDBOOK_TEXT.wordY : WORDBOOK_CARD_TEXT.wordY;
+    const wordFontSize = isPortrait
+      ? `${PORTRAIT_WORDBOOK_TEXT.wordFontSize}px`
+      : entry.display.length > 8
+        ? '24px'
+        : entry.display.length > 5
+          ? '28px'
+          : '32px';
     const word = this.add
-      .text(wordX, WORDBOOK_CARD_TEXT.wordY, entry.display, {
+      .text(wordX, wordY, entry.display, {
         fontFamily: FONT_FAMILY,
-        fontSize: entry.display.length > 8 ? '24px' : entry.display.length > 5 ? '28px' : '32px',
+        fontSize: wordFontSize,
         color: '#21324a',
         fontStyle: 'bold',
         align: 'center',
-        wordWrap: { width: wordbookTextWidth(), useAdvancedWrap: true },
+        wordWrap: { width: wordbookTextWidth(isPortrait), useAdvancedWrap: true },
       })
       .setOrigin(0.5);
 
     const manifestEntry = manifestEntryById(entry.levelId);
     const metaLabel = `Tier ${entry.tier}${manifestEntry ? ` · ${manifestEntry.category}` : ''}`;
+    const metaX = isPortrait ? PORTRAIT_WORDBOOK_TEXT.metaX : wordbookTextRight(isPortrait);
+    const metaY = isPortrait ? PORTRAIT_WORDBOOK_TEXT.metaY : WORDBOOK_CARD_TEXT.metaY;
+    const metaFontSize = isPortrait ? `${PORTRAIT_WORDBOOK_TEXT.metaFontSize}px` : '15px';
+    const metaColor = isPortrait ? '#54708c' : '#7f95ab';
+    const metaOriginX = isPortrait ? 0.5 : 1;
     const meta = this.add
-      .text(wordbookTextRight(), WORDBOOK_CARD_TEXT.metaY, metaLabel, {
+      .text(metaX, metaY, metaLabel, {
         fontFamily: FONT_FAMILY,
-        fontSize: '15px',
-        color: '#7f95ab',
+        fontSize: metaFontSize,
+        color: metaColor,
+        align: isPortrait ? 'center' : 'right',
       })
-      .setOrigin(1, 0.5);
+      .setOrigin(metaOriginX, 0.5);
 
+    const speakerConfig = wordbookSpeaker(isPortrait);
     const speakerBg = this.add.circle(
-      WORDBOOK_SPEAKER.x,
-      WORDBOOK_SPEAKER.y,
-      WORDBOOK_SPEAKER.radius,
+      speakerConfig.x,
+      speakerConfig.y,
+      speakerConfig.radius,
       0xeef6fd,
     );
+    const speakerBaseScale = isPortrait ? 0.46 : 0.32;
+    const speakerBounceScale = isPortrait ? 0.62 : 0.46;
     const speaker = this.add
-      .image(WORDBOOK_SPEAKER.x, WORDBOOK_SPEAKER.y, ATLAS_KEY, FRAMES.speaker)
-      .setScale(0.32);
+      .image(speakerConfig.x, speakerConfig.y, ATLAS_KEY, FRAMES.speaker)
+      .setScale(speakerBaseScale);
 
     const card = this.add.container(x, y, [bg, well, thumb.image, word, meta, speakerBg, speaker]);
     card.setSize(width, height);
@@ -287,7 +309,7 @@ export class WordbookScene extends Phaser.Scene {
     });
     card.on(Phaser.Input.Events.POINTER_UP, () => {
       void this.audio.playWord(entry.audioWord);
-      this.tweens.add({ targets: speaker, scale: 0.46, duration: 110, yoyo: true });
+      this.tweens.add({ targets: speaker, scale: speakerBounceScale, duration: 110, yoyo: true });
     });
 
     this.gridLayer.add(card);
@@ -373,6 +395,18 @@ export class WordbookScene extends Phaser.Scene {
       this.nextButton,
       isPortrait ? PORTRAIT_WORDBOOK.pagerY : WORDBOOK.pagerY,
     );
+    this.layout.setAnchor(this.prevButton, {
+      kind: 'left',
+      inset: isPortrait ? PORTRAIT_WORDBOOK.pagerInset : WORDBOOK.pagerInset,
+    });
+    this.layout.setAnchor(this.nextButton, {
+      kind: 'right',
+      inset: isPortrait ? PORTRAIT_WORDBOOK.pagerInset : WORDBOOK.pagerInset,
+    });
+    this.layout.setAnchor(this.backButton, {
+      kind: 'left',
+      inset: isPortrait ? PORTRAIT_WORDBOOK.backInset : WORDBOOK.backInset,
+    });
 
     const maxPages = this.pages(isPortrait);
     if (this.page >= maxPages) this.page = maxPages - 1;

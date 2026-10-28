@@ -145,6 +145,15 @@ export class StageLayout {
     }
   }
 
+  /** Update an anchored target's horizontal anchor rule. */
+  setAnchor(target: { x: number; y: number }, anchor: StageAnchor): void {
+    const entry = this.anchored.find((e) => e.target === target);
+    if (entry) {
+      entry.anchor = anchor;
+      entry.target.x = anchorX(this.stage, anchor);
+    }
+  }
+
   /** Run `cb` on every stage change (after the built-in re-anchoring). */
   onStageChange(cb: (stage: StageMetrics) => void): void {
     this.listeners.push(cb);
