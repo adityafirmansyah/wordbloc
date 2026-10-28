@@ -142,6 +142,7 @@ public/assets/
   images/<category>/<word>.webp    30 stickers, 512x512, RGBA, <40 KB each
   audio/words/<word>.mp3           30 word clips, -23 LUFS
   audio/phonemes/<phoneme>.mp3     50 phoneme clips
+  audio/sfx/<cue>.mp3              5 tactile SFX (snap, bounce, chime, star, click)
 ```
 
 - Level JSON keeps extension-free refs (`image: "animals/cat"`,
@@ -158,6 +159,21 @@ public/assets/
   never for an autoplay block, which is a policy state, not a broken file.
 - `phonemes/silent` deliberately has NO file: it must resolve to silence without a
   network request (a 404 per silent letter was the risk).
+- **Game juice (SFX)** rides the same manager through `playSfx(key)` with a closed key
+  set — `sfx/snap` (tile locks into a slot), `sfx/bounce` (invalid tile wobbles home;
+  never a harsh buzzer), `sfx/chime` (word solved), `sfx/star` (reward star reveal) and
+  `sfx/click` (button press). Three properties are requirements, not polish:
+  each cue starts on its OWN source node so it overlaps the phoneme/word speech instead
+  of cutting it off; the five buffers are decoded per scene and pooled OUTSIDE the
+  word/phoneme LRU so a long level cannot evict them; and SFX are NEVER synthesised via
+  Web Speech — a missing cue is silence, because a spoken "snap" is not a snap.
+  Mute silences playback (buffers are still decoded ahead of time).
+- **One `AudioContext` per document.** Every scene builds its own `AudioManager`, so a
+  per-manager context leaked one context per scene transition (measured: 38 over 12
+  transitions on main) with nothing ever closing them. The context is now created once
+  per page and borrowed; `dispose()` closes only a context the engine itself built.
+  Real browsers cap concurrent contexts per document, so the leak would eventually
+  silence the game mid-session.
 - Browsers start an `AudioContext` suspended until a user gesture. Scenes therefore
   call `audio.unlock()` from their first pointerdown; `GameScene` re-speaks its arrival
   word afterwards if the pre-gesture attempt was swallowed.

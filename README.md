@@ -22,6 +22,7 @@ public/assets/
   images/<category>/<word>.webp    30 stickers, 512x512, transparent, <40 KB each
   audio/words/<word>.mp3           30 word clips, -23 LUFS normalised
   audio/phonemes/<phoneme>.mp3     50 phoneme clips (letter SOUND, not letter name)
+  audio/sfx/<cue>.mp3              5 tactile SFX: snap, bounce, chime, star, click
 ```
 
 Total payload is 1.9 MB. Source refs in the level JSON stay extension-free
@@ -40,6 +41,45 @@ Loading rules:
   file on purpose: it resolves to silence without a network request.
 - Scenes call `audio.unlock()` from their first pointerdown, because browsers start an
   `AudioContext` suspended until a gesture.
+
+### Game juice (SFX)
+
+`AudioManager.playSfx(key)` plays one of five short cues, wired to the interactions
+that should _feel_ like something:
+
+| key          | file                   | when                                     |
+| ------------ | ---------------------- | ---------------------------------------- |
+| `sfx/snap`   | `audio/sfx/snap.mp3`   | a tile locks into a slot                 |
+| `sfx/bounce` | `audio/sfx/bounce.mp3` | an invalid tile wobbles home (no buzzer) |
+| `sfx/chime`  | `audio/sfx/chime.mp3`  | the word is solved                       |
+| `sfx/star`   | `audio/sfx/star.mp3`   | the reward star scales up                |
+| `sfx/click`  | `audio/sfx/click.mp3`  | a button press                           |
+
+SFX are deliberately **not** the phonics path:
+
+- **Never synthesised.** Web Speech saying "snap" is not a snap, so a missing SFX file
+  degrades to silence instead of speech.
+- **Overlapping.** Every cue starts on its own `AudioBufferSourceNode`, so the chime
+  plays _with_ the solved word and the snap plays _with_ the tile's phoneme — neither
+  cuts the other off.
+- **Own pool, preloaded.** The five buffers are decoded at scene `create()` and kept
+  outside the word/phoneme LRU, so a 9-letter level can never evict the next click.
+- **Muted plays nothing.** A muted game starts no cue; the buffers are still decoded
+  (28 KB) so the first click after unmuting is instant.
+
+### One AudioContext per document
+
+Every scene builds its own `AudioManager`, so the context must NOT be per manager.
+It is created once per page (`sharedContextFactory`) and borrowed by every engine;
+`dispose()` only closes a context the engine itself built (the injected-factory path
+tests use). Measured on the built app: **main leaked 38 AudioContexts over 12
+scene transitions; this branch creates 2 (both at boot) and 0 thereafter.** Nothing
+closed them before, and browsers cap concurrent contexts per document — a long
+session would eventually start no audio at all, which is exactly the "sometimes
+there is no sound" bug that resists reproduction.
+
+`sfx/snap`, `sfx/bounce`, `sfx/chime`, `sfx/star`, `sfx/click` are the only accepted
+keys (`SfxKey`); anything else resolves to silence without a network request.
 
 ## Dev
 
@@ -78,7 +118,7 @@ src/
     puzzle.ts             pure core-loop rules (no Phaser) — unit tested
     progress.ts           unlock / resume rules (manifest only)
     wordbook.ts           localStorage persistence (graceful degradation)
-    audio.ts              phonics playback facade (never crashes on a missing key)
+    audio.ts              phonics + SFX playback facade (never crashes on a missing key)
     uiAtlas.ts            builds ONE procedural texture atlas at boot
     theme.ts              design tokens, stage model, layout bands, touch-target math
     rng.ts                seeded PRNG for stable tray shuffles
@@ -122,6 +162,14 @@ Real art replaces this atlas in a later milestone.
 degrades to silence (or the Web Speech API when available). A missing audio key
 never throws. Placing a tile speaks the **phoneme**; completing a word speaks the
 **whole word** — letter names are a defect per the spec.
+
+Game juice adds five tactile cues on the same manager (`playSfx`): a wooden snap when
+a tile locks, a rubbery boing when it wobbles home (never a buzzer), a chime on a
+solved word, a star ping on the reward reveal, and a soft click on buttons. They run
+on their own source nodes so a cue overlaps the speech it accompanies instead of
+cutting it off, are preloaded per scene, and live outside the word/phoneme LRU so a
+long level cannot evict them. A missing SFX file is silence — never a synthesised
+"snap".
 
 ### Stage & touch targets
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AudioManager,
   MAX_CLIPS,
@@ -9,6 +9,7 @@ import {
   WebAudioEngine,
   audioKeysForLevel,
   phonemeToSpeakable,
+  resetSharedContext,
   type AudioContextLike,
   type AudioEngine,
   type AudioSource,
@@ -743,6 +744,133 @@ describe('WebAudioEngine', () => {
     await engine.prepare({ key: 'a', url: 'assets/audio/a.mp3' });
     await engine.prepare({ key: 'b', url: 'assets/audio/b.mp3' });
     expect(built).toBe(1);
+  });
+});
+
+/**
+ * The context is per DOCUMENT, not per scene.
+ *
+ * Measured defect in the built app: every scene builds its own `AudioManager`, so a
+ * per-manager context leaked one `AudioContext` per scene transition (24 in 12
+ * transitions on this branch, 16 on main) and nothing closed any of them. Browsers
+ * cap concurrent contexts per document, so a long session would eventually start no
+ * audio at all.
+ *
+ * These tests pin the two halves of the fix: engines built from the DEFAULT factory
+ * share one context, and disposing a borrowing engine does not close it (which would
+ * silence every other scene).
+ */
+describe('WebAudioEngine — one shared AudioContext per document', () => {
+  // The shared context is module state: leaving a stub-built one in place would
+  // leak into the next test file's run of defaultEngine().
+  afterEach(() => {
+    resetSharedContext();
+    vi.unstubAllGlobals();
+  });
+
+  /** Installs a counting AudioContext constructor on the jsdom window. */
+  function installCountingContext() {
+    const state = { created: 0, closed: 0 };
+    class Counting {
+      state = 'running';
+      destination = 'dest';
+      currentTime = 0;
+      resumed = 0;
+      resume() {
+        this.resumed += 1;
+        return Promise.resolve();
+      }
+      decodeAudioData() {
+        return Promise.resolve({ duration: 0.2 });
+      }
+      createBufferSource() {
+        return {
+          buffer: null,
+          onended: null,
+          connect: () => undefined,
+          start: () => undefined,
+          stop: () => undefined,
+        };
+      }
+      close() {
+        state.closed += 1;
+        return Promise.resolve();
+      }
+      constructor() {
+        state.created += 1;
+      }
+    }
+    vi.stubGlobal('AudioContext', Counting);
+    resetSharedContext();
+    return state;
+  }
+
+  it('isSupported() probes the constructor WITHOUT building a context', () => {
+    const state = installCountingContext();
+    expect(WebAudioEngine.isSupported()).toBe(true);
+    expect(WebAudioEngine.isSupported()).toBe(true);
+    // The decisive assertion: asking "is Web Audio available?" allocates nothing.
+    expect(state.created).toBe(0);
+    resetSharedContext();
+  });
+
+  it('two engines from the default factory share ONE context', async () => {
+    const state = installCountingContext();
+    const fetchImpl = makeFetch().fetchImpl;
+    // Default CONTEXT factory (the thing under test), injected fetch (jsdom cannot
+    // resolve a relative URL). No contextFactory => shared context.
+    const a = new WebAudioEngine({ fetchImpl });
+    const b = new WebAudioEngine({ fetchImpl });
+
+    await a.prepare({ key: 'words/cat', url: 'assets/audio/words/cat.mp3' });
+    await b.prepare({ key: 'sfx/snap', url: 'assets/audio/sfx/snap.mp3' });
+
+    // Three scenes in a row would have made three; the session makes one.
+    expect(state.created).toBe(1);
+    resetSharedContext();
+  });
+
+  it('disposing a borrowing engine never closes the shared context', async () => {
+    const state = installCountingContext();
+    const fetchImpl = makeFetch().fetchImpl;
+    const engine = new WebAudioEngine({ fetchImpl });
+    await engine.prepare({ key: 'sfx/star', url: 'assets/audio/sfx/star.mp3' });
+
+    engine.dispose();
+    // Closing it here would silence the next scene for the rest of the session.
+    expect(state.closed).toBe(0);
+
+    // And another engine still gets the same live context afterwards.
+    const next = new WebAudioEngine({ fetchImpl });
+    await next.prepare({ key: 'sfx/chime', url: 'assets/audio/sfx/chime.mp3' });
+    expect(state.created).toBe(1);
+    resetSharedContext();
+  });
+
+  it('still closes an INJECTED context on dispose (tests own that one)', async () => {
+    const context = makeContext();
+    const engine = new WebAudioEngine({
+      contextFactory: () => context,
+      fetchImpl: makeFetch().fetchImpl,
+    });
+    await engine.prepare({ key: 'phonemes/k', url: 'assets/audio/phonemes/k.mp3' });
+    engine.dispose();
+    expect(context.closed()).toBe(1);
+  });
+
+  it('a scene manager and a button click in the next scene hit the same context', async () => {
+    // The real sequence: Menu creates a manager, Game creates another on the very
+    // next tap. Both must reuse the one context.
+    const state = installCountingContext();
+    const menu = new AudioManager({ engine: new WebAudioEngine() });
+    await menu.playSfx('sfx/click');
+    menu.release();
+
+    const game = new AudioManager({ engine: new WebAudioEngine() });
+    await game.playSfx('sfx/snap');
+
+    expect(state.created).toBe(1);
+    resetSharedContext();
   });
 });
 

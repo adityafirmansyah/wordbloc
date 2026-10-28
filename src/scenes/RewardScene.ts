@@ -7,7 +7,7 @@ import {
   preloadLevel,
 } from '../game/levels';
 import { wordbook } from '../game/wordbook';
-import { AudioManager } from '../game/audio';
+import { AudioManager, type SfxKey } from '../game/audio';
 import {
   ATLAS_KEY,
   COLORS,
@@ -43,6 +43,8 @@ export class RewardScene extends Phaser.Scene {
   create(): void {
     this.audio = new AudioManager();
     this.audio.setEnabled(this.registry.get('muted') !== true);
+    // Star ping decoded ahead of the reveal, so it lands exactly on the scale-up.
+    this.audio.preloadSfx();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.release());
 
     // The manifest row is instant; it carries the word/audio the screen needs.
@@ -125,8 +127,16 @@ export class RewardScene extends Phaser.Scene {
       .setDepth(0);
   }
 
+  /** Game-juice click for this scene's buttons; reads the live manager. */
+  private clickSfx = (key: SfxKey): void => {
+    void this.audio.playSfx(key).catch(() => undefined);
+  };
+
   private drawStar(isNew: boolean): void {
     const star = this.add.image(ISLAND_CENTRE_X, 186, ATLAS_KEY, FRAMES.star).setScale(0.2);
+    // The ping fires as the star starts growing, not when it lands: the sound has
+    // to lead the animation by a frame or two or the reveal feels disconnected.
+    void this.audio.playSfx('sfx/star');
     this.tweens.add({
       targets: star,
       scale: 2.1,
@@ -173,6 +183,7 @@ export class RewardScene extends Phaser.Scene {
         label: 'Next',
         onClick: () => this.scene.start(SCENES.game, { levelId: upcoming.id }),
         variant: 'primary',
+        sfx: this.clickSfx,
       });
     } else {
       makeText(this, ISLAND_CENTRE_X, 528, 'You finished every level!', 32, '#54708c', true);
@@ -186,6 +197,7 @@ export class RewardScene extends Phaser.Scene {
       height: 128,
       fontSize: 34,
       variant: 'alt',
+      sfx: this.clickSfx,
       onClick: () => this.scene.start(SCENES.game, { levelId: this.levelId }),
     });
 
@@ -197,6 +209,7 @@ export class RewardScene extends Phaser.Scene {
       height: 128,
       fontSize: 34,
       variant: 'alt',
+      sfx: this.clickSfx,
       onClick: () => this.scene.start(SCENES.wordbook),
     });
   }

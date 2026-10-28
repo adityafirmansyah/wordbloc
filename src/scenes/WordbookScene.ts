@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { AudioManager } from '../game/audio';
+import { AudioManager, type SfxKey } from '../game/audio';
 import { imageKeyFor } from '../game/assets';
 import { manifestCount, manifestEntryById, preloadLevel } from '../game/levels';
 import { wordbook, type WordbookEntry } from '../game/wordbook';
@@ -58,6 +58,8 @@ export class WordbookScene extends Phaser.Scene {
   create(): void {
     this.audio = new AudioManager();
     this.audio.setEnabled(this.registry.get('muted') !== true);
+    // Decode the click/pager SFX up front so a press never waits on the network.
+    this.audio.preloadSfx();
     // A replayed word must stop when the kid leaves the Wordbook.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.release());
     // Autoplay policy: only a gesture can start the audio context, and this scene
@@ -82,6 +84,11 @@ export class WordbookScene extends Phaser.Scene {
       .setDepth(0);
   }
 
+  /** Game-juice click for this scene's buttons; reads the live manager. */
+  private clickSfx = (key: SfxKey): void => {
+    void this.audio.playSfx(key).catch(() => undefined);
+  };
+
   private drawHeader(): void {
     // Back sits in the header (it used to sit under the grid, covering row 3 and
     // overflowing the stage by 6px), pinned inside the live stage's left edge.
@@ -93,6 +100,7 @@ export class WordbookScene extends Phaser.Scene {
       height: WORDBOOK.backButtonHeight,
       fontSize: 34,
       variant: 'alt',
+      sfx: this.clickSfx,
       onClick: () => this.scene.start(SCENES.menu),
     });
     this.layout.attach(back, { kind: 'left', inset: WORDBOOK.backInset });
@@ -103,6 +111,7 @@ export class WordbookScene extends Phaser.Scene {
       y: WORDBOOK.backButtonY,
       frame: FRAMES.home,
       size: 132,
+      sfx: this.clickSfx,
       onClick: () => this.scene.start(SCENES.menu),
     });
 
@@ -284,6 +293,7 @@ export class WordbookScene extends Phaser.Scene {
       y: WORDBOOK.pagerY,
       frame: FRAMES.arrowLeft,
       size: WORDBOOK.pagerButtonSize,
+      sfx: this.clickSfx,
       onClick: () => this.goToPage(this.page - 1),
     });
 
@@ -293,6 +303,7 @@ export class WordbookScene extends Phaser.Scene {
       y: WORDBOOK.pagerY,
       frame: FRAMES.arrowRight,
       size: WORDBOOK.pagerButtonSize,
+      sfx: this.clickSfx,
       onClick: () => this.goToPage(this.page + 1),
     });
 

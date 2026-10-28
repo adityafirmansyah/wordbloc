@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { AudioManager, audioKeysForLevel } from '../game/audio';
+import { AudioManager, audioKeysForLevel, type SfxKey } from '../game/audio';
 import {
   levelManifest,
   loadLevel,
@@ -117,6 +117,10 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.audio = new AudioManager();
     this.audio.setEnabled(this.registry.get('muted') !== true);
+    // Game juice: decode the five SFX buffers NOW, so the first tile drop of the
+    // session snaps with no fetch/decode gap. Decoding does not need a gesture
+    // (only starting a source does), so this is safe pre-unlock.
+    this.audio.preloadSfx();
     // Navigate away mid-clip and the word must stop: the pool is scene-scoped.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.release());
 
@@ -201,6 +205,7 @@ export class GameScene extends Phaser.Scene {
       y: BANDS.trayCenterY,
       frame: FRAMES.home,
       size: 132,
+      sfx: this.clickSfx,
       onClick: () => this.scene.start(SCENES.menu),
     });
   }
@@ -224,6 +229,7 @@ export class GameScene extends Phaser.Scene {
       y: BANDS.headerCenterY,
       frame: FRAMES.home,
       size: 132,
+      sfx: this.clickSfx,
       onClick: () => this.scene.start(SCENES.menu),
     });
     home.setDepth(20);
@@ -282,6 +288,15 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Game-juice click handed to button builders. Reads the live `audio` field at
+   * call time (never captured), so a button created before a mute toggle or a
+   * scene restart always goes through the current manager. Never throws.
+   */
+  private clickSfx = (key: SfxKey): void => {
+    void this.audio.playSfx(key).catch(() => undefined);
+  };
+
   /** Speaks the level word once; records whether the FILE actually played. */
   private speakIntroWord(): Promise<void> {
     if (!this.level || this.introWordSpoken) return Promise.resolve();
@@ -302,6 +317,7 @@ export class GameScene extends Phaser.Scene {
       y: BANDS.headerCenterY,
       frame: FRAMES.home,
       size: 132,
+      sfx: this.clickSfx,
       onClick: () => this.scene.start(SCENES.menu),
     });
     back.setDepth(20);
@@ -342,6 +358,10 @@ export class GameScene extends Phaser.Scene {
     const next = !(this.registry.get('muted') === true);
     this.registry.set('muted', next);
     this.audio.setEnabled(!next);
+    // The mute button is the one control whose feedback IS the state change, so it
+    // deliberately takes no button click: the tap that unmutes clicks (sound is
+    // back), and the tap that mutes is silent (no truncated clip on the way out).
+    if (!next) void this.audio.playSfx('sfx/click');
     const icon = button.getAt(1);
     if (icon instanceof Phaser.GameObjects.Image) {
       icon.setFrame(next ? FRAMES.lock : FRAMES.speaker);
@@ -684,6 +704,11 @@ export class GameScene extends Phaser.Scene {
     tile.container.disableInteractive();
     tile.container.setDepth(8);
 
+    // MAGNETIC SNAP, AUDIBLE FIRST: the wooden click lands on the same frame the
+    // tile starts moving, so the lock reads as tactile. It is a separate source
+    // node, so the phoneme below overlaps it instead of cutting it off.
+    void this.audio.playSfx('sfx/snap');
+
     // Magnetic snap: pull the tile into the slot centre with a spring feel.
     this.tweens.add({
       targets: tile.container,
@@ -724,9 +749,14 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Wrong placement: tween back to the tray home. Silent and penalty-free. */
+  /**
+   * Wrong placement: tween back to the tray home. No penalty, no buzzer — the
+   * rubbery boing is the whole "not here, try again" message, and it is gentle on
+   * purpose (a harsh error tone is a defect for a 6-year-old).
+   */
   private bounceHome(tile: TileView): void {
     this.tweens.killTweensOf(tile.container);
+    void this.audio.playSfx('sfx/bounce');
     this.tweens.add({
       targets: tile.container,
       x: tile.home.x,
@@ -757,6 +787,9 @@ export class GameScene extends Phaser.Scene {
     if (this.solved) return;
     this.solved = true;
 
+    // Chime and word together: the chord is the reward, the word is the lesson.
+    // Separate source nodes, so the chime colours the speech instead of clipping it.
+    void this.audio.playSfx('sfx/chime');
     this.audio.playWord(this.level.audio_word);
 
     // Confetti from the atlas dot frame — no extra assets.

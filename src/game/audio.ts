@@ -7,6 +7,15 @@
  *
  *   playPhoneme('phonemes/k')  -> assets/audio/phonemes/k.mp3
  *   playWord('words/cat')      -> assets/audio/words/cat.mp3
+ *   playSfx('sfx/snap')        -> assets/audio/sfx/snap.mp3
+ *
+ * SFX (`playSfx`) is the game-juice layer: a wooden snap on a locked tile, a
+ * rubbery boing on a wrong drop, a chime on a solved word, a star ping on the
+ * reward reveal and a soft click on buttons. It is deliberately NOT the phoneme
+ * path: an SFX never falls back to Web Speech (a tile that says the word "snap"
+ * is a bug, not a degradation), it lives in its own buffer pool so a level's word
+ * and phoneme clips can never evict it, and it starts on its own
+ * `AudioBufferSourceNode` so it overlaps the word instead of cutting it off.
  *
  * PLAYBACK: Web Audio first, `HTMLMediaElement` second, Web Speech last.
  *
@@ -43,6 +52,32 @@ import { audioUrl } from './assets';
  * without touching the network (a 404 per silent tile was the old risk).
  */
 export const SILENT_PHONEME = 'phonemes/silent';
+
+/**
+ * The five tactile feedback clips (`public/assets/audio/sfx/*.mp3`). Closed set:
+ * anything else is refused rather than turned into a wild network request.
+ *
+ *   sfx/snap   — crisp wooden snap, a tile locking into a slot
+ *   sfx/bounce — gentle rubbery boing, an invalid tile wobbling home (never a buzzer)
+ *   sfx/chime  — joyful chord sparkle, the word is solved
+ *   sfx/star   — magical bell ping, the reward star scales up
+ *   sfx/click  — soft bubble click, a button press
+ */
+export type SfxKey = 'sfx/snap' | 'sfx/bounce' | 'sfx/chime' | 'sfx/star' | 'sfx/click';
+
+/** Every supported SFX key, in the order a session tends to hear them. */
+export const SFX_KEYS: readonly SfxKey[] = [
+  'sfx/snap',
+  'sfx/bounce',
+  'sfx/chime',
+  'sfx/star',
+  'sfx/click',
+];
+
+/** Type guard: distinguishes a known SFX key from an arbitrary string. */
+export function isSfxKey(key: string): key is SfxKey {
+  return (SFX_KEYS as readonly string[]).includes(key);
+}
 
 /**
  * How a play request was served:
@@ -212,8 +247,38 @@ interface PreparedBuffer extends PreparedClip {
   readonly buffer: DecodedAudioLike;
 }
 
+/**
+ * One `AudioContext` per DOCUMENT, shared by every scene.
+ *
+ * Every scene builds its own `AudioManager`, so a per-manager context meant one
+ * context per scene transition and nothing ever closed them: measured in the built
+ * app, 12 menu→game→reward cycles created 24 contexts (16 before this branch). Real
+ * browsers cap concurrent contexts per document, so a long session would eventually
+ * fail to start ANY audio — the tile would go silent mid-level, which is exactly the
+ * kind of "sometimes there is no sound" bug that is impossible to reproduce on
+ * demand. Sharing one context keeps the count at 1 for the whole session.
+ */
+let sharedContext: AudioContextLike | null = null;
+let sharedContextBuilt = false;
+
+/**
+ * True when the platform exposes an AudioContext constructor at all.
+ *
+ * Deliberately a CONSTRUCTOR probe, not a "build one and see" check: constructing a
+ * context has a real cost (that is the leak this module now prevents), so deciding
+ * whether Web Audio exists must not allocate one.
+ */
+function canBuildContext(): boolean {
+  if (typeof window === 'undefined') return false;
+  const w = window as Window & {
+    AudioContext?: unknown;
+    webkitAudioContext?: unknown;
+  };
+  return Boolean(w.AudioContext ?? w.webkitAudioContext);
+}
+
 /** Builds a real AudioContext, or null where the API does not exist. */
-function defaultContextFactory(): AudioContextLike | null {
+function buildContext(): AudioContextLike | null {
   if (typeof window === 'undefined') return null;
   const w = window as Window & {
     AudioContext?: new () => AudioContextLike;
@@ -228,6 +293,23 @@ function defaultContextFactory(): AudioContextLike | null {
   }
 }
 
+/** The session-wide context factory used by `defaultEngine()`. */
+function sharedContextFactory(): AudioContextLike | null {
+  if (sharedContextBuilt) return sharedContext;
+  sharedContextBuilt = true;
+  sharedContext = buildContext();
+  return sharedContext;
+}
+
+/**
+ * Drops the shared context. Only tests should need this: in the app the context
+ * lives as long as the page, which is the point.
+ */
+export function resetSharedContext(): void {
+  sharedContext = null;
+  sharedContextBuilt = false;
+}
+
 /**
  * Web Audio engine: decode once per clip, then start a fresh
  * `AudioBufferSourceNode` for each play.
@@ -239,6 +321,12 @@ function defaultContextFactory(): AudioContextLike | null {
 export class WebAudioEngine implements AudioEngine {
   private readonly contextFactory: () => AudioContextLike | null;
   private readonly fetchImpl: FetchLike;
+  /**
+   * True when this engine built its context from an injected factory. The default
+   * (session-shared) context is BORROWED, so `dispose()` must not close it — one
+   * scene tearing down would otherwise kill audio for every other scene.
+   */
+  private readonly ownsContext: boolean;
   private context: AudioContextLike | null = null;
   private contextBuilt = false;
   /** Nodes still running, so `stop()` / `dispose()` can cut them off. */
@@ -247,7 +335,8 @@ export class WebAudioEngine implements AudioEngine {
   constructor(
     options: { contextFactory?: () => AudioContextLike | null; fetchImpl?: FetchLike } = {},
   ) {
-    this.contextFactory = options.contextFactory ?? defaultContextFactory;
+    this.contextFactory = options.contextFactory ?? sharedContextFactory;
+    this.ownsContext = options.contextFactory !== undefined;
     this.fetchImpl =
       options.fetchImpl ??
       ((url) => {
@@ -258,9 +347,12 @@ export class WebAudioEngine implements AudioEngine {
       });
   }
 
-  /** True when this environment can build an AudioContext at all. */
+  /**
+   * True when this environment can build an AudioContext at all. Probes the
+   * CONSTRUCTOR only — building one here would defeat the shared-context rule.
+   */
   static isSupported(): boolean {
-    return defaultContextFactory() !== null;
+    return canBuildContext();
   }
 
   private ensureContext(): AudioContextLike | null {
@@ -388,6 +480,13 @@ export class WebAudioEngine implements AudioEngine {
     );
   }
 
+  /**
+   * Stops this engine's running nodes.
+   *
+   * A BORROWED context (the session-shared one) is left open: closing it would
+   * silence every other scene for the rest of the page's life. Only a context this
+   * engine built itself — the injected-factory case, used by tests — is closed.
+   */
   dispose(): void {
     for (const entry of [...this.running]) {
       this.running.delete(entry);
@@ -400,6 +499,7 @@ export class WebAudioEngine implements AudioEngine {
     const context = this.context;
     this.context = null;
     this.contextBuilt = true;
+    if (!this.ownsContext) return;
     try {
       void context?.close?.();
     } catch {
@@ -585,6 +685,11 @@ export interface AudioManagerOptions {
 /**
  * Owns the clip pool for ONE scene. Scenes create a manager in `create()` and call
  * `release()` on shutdown so a word cannot keep playing after the kid has moved on.
+ *
+ * SFX live in a SECOND pool (`sfxClips`) rather than the LRU one on purpose:
+ * a level's word + 9 phonemes already brush against MAX_CLIPS, and the LRU
+ * eviction would happily trade away `sfx/snap` for `phonemes/t` — turning the next
+ * tile drop silent mid-level. Five clips of a few KB each is a fixed cost.
  */
 export class AudioManager {
   private readonly engine: AudioEngine | null;
@@ -593,7 +698,11 @@ export class AudioManager {
   private readonly clips = new Map<string, PreparedClip>();
   /** key -> in-flight prepare, so a repeated preload shares one fetch. */
   private readonly preparing = new Map<string, Promise<PreparedClip | null>>();
-  /** Keys whose file failed; the speech fallback owns them from now on. */
+  /** SFX pool: at most SFX_KEYS.length entries, never LRU-evicted. */
+  private readonly sfxClips = new Map<SfxKey, PreparedClip>();
+  /** SFX key -> in-flight prepare, so a preload cannot double-fetch a tap. */
+  private readonly sfxPreparing = new Map<SfxKey, Promise<PreparedClip | null>>();
+  /** Keys whose file failed (word / phoneme / sfx namespaces never collide). */
   private readonly failed = new Set<string>();
   private enabled = true;
   private lastResult: AudioPlayResult = { key: '', outcome: 'silent', url: '' };
@@ -608,6 +717,8 @@ export class AudioManager {
     if (!enabled) {
       this.cancelSpeech();
       for (const clip of this.clips.values()) this.engine?.stop(clip);
+      // A muted game must not finish a chime the kid already triggered.
+      for (const clip of this.sfxClips.values()) this.engine?.stop(clip);
     }
   }
 
@@ -619,9 +730,10 @@ export class AudioManager {
     return this.lastResult;
   }
 
-  /** True when a clip is already prepared and pooled for `key`. */
+  /** True when a clip is already prepared and pooled for `key` (word or SFX). */
   has(key: string): boolean {
-    return this.clips.has(key);
+    if (this.clips.has(key)) return true;
+    return isSfxKey(key) && this.sfxClips.has(key);
   }
 
   /** True when the file for `key` could not be loaded (speech fallback territory). */
@@ -678,15 +790,118 @@ export class AudioManager {
     return this.play(key, 0.8);
   }
 
+  /**
+   * Game-juice SFX — a snap, a boing, a chime, a star ping or a click.
+   *
+   * Differences from `playPhoneme`/`playWord`, all deliberate:
+   *  - **never synthesised**: Web Speech saying "snap" is not a wooden snap, so a
+   *    missing SFX file degrades to silence;
+   *  - **overlapping**: each call starts a fresh source node on top of whatever
+   *    word/phoneme is speaking, so a snap never cuts the tile's phoneme off;
+   *  - **own pool**: an SFX buffer cannot be evicted by the word/phoneme LRU.
+   *
+   * Never throws; the promise always settles (a blocked autoplay context is
+   * reported as 'silent').
+   */
+  playSfx(key: SfxKey): Promise<AudioPlayResult> {
+    return this.playTone(key);
+  }
+
+  /**
+   * Decodes every SFX buffer ahead of time, so the first tile drop of a session
+   * has no fetch/decode latency. Idempotent, never throws.
+   *
+   * Deliberately NOT gated on `enabled`, matching `preload()`: a session that
+   * starts muted can be unmuted at any moment, and warming 28 KB of SFX while
+   * muted is what makes the first click after unmuting instant. Playing is what
+   * mute suppresses, not preparing.
+   *
+   * Returns the URLs it started preparing (tests / diagnostics).
+   */
+  preloadSfx(keys: readonly SfxKey[] = SFX_KEYS): string[] {
+    const started: string[] = [];
+    if (!this.engine) return started;
+    for (const key of keys) {
+      if (this.sfxClips.has(key) || this.failed.has(key) || this.sfxPreparing.has(key)) continue;
+      started.push(audioUrl(key));
+      void this.prepareSfx(key);
+    }
+    return started;
+  }
+
   /** Stops everything and drops the pool. Used on scene shutdown. */
   release(): void {
     this.cancelSpeech();
     for (const clip of this.clips.values()) this.engine?.stop(clip);
+    for (const clip of this.sfxClips.values()) this.engine?.stop(clip);
     this.clips.clear();
     this.preparing.clear();
+    this.sfxClips.clear();
+    this.sfxPreparing.clear();
   }
 
   // ------------------------------------------------------------------ internals
+
+  /**
+   * SFX playback: no speech fallback, own pool, own source node.
+   *
+   * Silence is the correct answer for every non-playable case — muted, no engine,
+   * a 404, an undecodable byte stream, an autoplay-blocked context — because a
+   * missing click must never spill into the phonics layer (or throw into a tween
+   * callback).
+   */
+  private async playTone(key: SfxKey): Promise<AudioPlayResult> {
+    if (!this.enabled || !isSfxKey(key)) return this.remember({ key, outcome: 'silent', url: '' });
+
+    const url = audioUrl(key);
+    if (this.failed.has(key)) return this.remember({ key, outcome: 'silent', url });
+
+    const clip = await this.prepareSfx(key);
+    if (!clip) return this.remember({ key, outcome: 'silent', url });
+
+    try {
+      await this.engine?.play(clip);
+    } catch (error) {
+      // A policy block keeps the buffer: the next gesture plays it.
+      if (isPolicyError(error)) return this.remember({ key, outcome: 'silent', url });
+      this.failed.add(key);
+      this.sfxClips.delete(key);
+      return this.remember({ key, outcome: 'silent', url });
+    }
+
+    return this.remember({ key, outcome: 'file', url });
+  }
+
+  /** Pooled SFX clip for `key`, preparing it once (no LRU: the set is fixed). */
+  private async prepareSfx(key: SfxKey): Promise<PreparedClip | null> {
+    const pooled = this.sfxClips.get(key);
+    if (pooled) return pooled;
+
+    const inFlight = this.sfxPreparing.get(key);
+    if (inFlight) return inFlight;
+
+    const engine = this.engine;
+    if (!engine) return null;
+
+    const task = (async (): Promise<PreparedClip | null> => {
+      try {
+        const clip = await engine.prepare({ key, url: audioUrl(key) });
+        this.sfxClips.set(key, clip);
+        return clip;
+      } catch {
+        // Memoise: a missing/broken SFX must not be re-fetched on every tap.
+        this.failed.add(key);
+        return null;
+      }
+    })();
+
+    this.sfxPreparing.set(key, task);
+    const forget = (): void => {
+      this.sfxPreparing.delete(key);
+    };
+    void task.then(forget, forget);
+    return task;
+  }
 
   private async play(key: string, speechRate: number): Promise<AudioPlayResult> {
     if (!this.enabled || !key) return this.remember({ key, outcome: 'silent', url: '' });
