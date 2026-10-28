@@ -321,16 +321,16 @@ describe('touch targets — regression: only landscape satisfied 64 CSS px', () 
     }
   });
 
-  it('portrait phones fall below the supported scale — hence the gate', () => {
-    // Measured in a real browser: 41.4 / 37.5 / 36.0 CSS px cards.
+  it('portrait phones reach supported scale and clear touch targets under dual-orientation mode', () => {
+    // Under dual-orientation portrait base (720x1280), scale is >= 0.5 and cards clear touch target floors
     for (const [w, h] of [
       [414, 896],
       [375, 667],
       [360, 640],
     ] as const) {
       const { scale } = stageMetrics(w, h);
-      expect(scale, `${w}x${h}`).toBeLessThan(MIN_VIEWPORT_SCALE);
-      expect(WORDBOOK.card.height * scale, `${w}x${h} card`).toBeLessThan(MIN_TOUCH_CSS);
+      expect(scale, `${w}x${h}`).toBeGreaterThanOrEqual(MIN_VIEWPORT_SCALE);
+      expect(WORDBOOK.card.height * scale, `${w}x${h} card`).toBeGreaterThanOrEqual(MIN_TOUCH_CSS);
     }
   });
 

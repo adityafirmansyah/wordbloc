@@ -7,7 +7,8 @@ import {
   BANDS,
   FRAMES,
   ISLAND_CENTRE_X,
-  ISLAND_CENTRE_Y,
+  PORTRAIT_BANDS,
+  PORTRAIT_ISLAND_CENTRE_X,
   SCENES,
   type StageMetrics,
 } from '../game/theme';
@@ -39,66 +40,110 @@ export class MenuScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.release());
 
     // Stage first: it paints the full-bleed backdrop and keeps the camera centred
-    // on the 1280x720 content island on any viewport aspect ratio.
+    // on the content island on any viewport aspect ratio.
     this.layout = new StageLayout(this, { hills: true });
+    const isPortrait = this.layout.metrics.isPortrait;
 
     // Title block: letter tiles spelling WORDBLOC would be noisy; use wordmark art.
-    const wordmark = makeText(this, ISLAND_CENTRE_X, 150, 'WORDBLOC', 104, '#21324a', true);
+    const initialCenterX = isPortrait ? PORTRAIT_ISLAND_CENTRE_X : ISLAND_CENTRE_X;
+    const initialWordmarkY = isPortrait ? 260 : 150;
+    const initialSubtitleY = isPortrait ? 350 : 226;
+    const initialWordmarkSize = isPortrait ? 92 : 104;
+
+    const wordmark = makeText(
+      this,
+      initialCenterX,
+      initialWordmarkY,
+      'WORDBLOC',
+      initialWordmarkSize,
+      '#21324a',
+      true,
+    );
     wordmark.setShadow(0, 6, 'rgba(0,0,0,0.18)', 0);
     wordmark.setDepth(5);
 
-    makeText(this, ISLAND_CENTRE_X, 226, 'Build words, open worlds.', 34, '#54708c');
+    const subtitle = makeText(
+      this,
+      initialCenterX,
+      initialSubtitleY,
+      'Build words, open worlds.',
+      isPortrait ? 32 : 34,
+      '#54708c',
+    );
 
     // Decorative floating tiles along the bottom edge, spread across the LIVE
-    // stage so a wide phone screen stays decorated out to its edges.
+    // stage so a wide or tall screen stays decorated out to its edges.
     this.addFloatingTiles();
 
     const book = wordbook();
 
-    makeButton(this, {
-      x: ISLAND_CENTRE_X,
-      y: 354,
+    const playBtn = makeButton(this, {
+      x: initialCenterX,
+      y: isPortrait ? 530 : 354,
       label: 'Play',
       onClick: () => this.startGame(),
       variant: 'primary',
       sfx: this.clickSfx,
     });
 
-    makeButton(this, {
-      x: ISLAND_CENTRE_X,
-      y: 514,
+    const wordbookBtn = makeButton(this, {
+      x: initialCenterX,
+      y: isPortrait ? 690 : 514,
       label: `Wordbook (${book.count()})`,
       onClick: () => this.scene.start(SCENES.wordbook),
       variant: 'alt',
       sfx: this.clickSfx,
     });
 
-    const stars = this.add.container(0, 92, [
+    const stars = this.add.container(0, isPortrait ? 80 : 92, [
       this.add.image(0, 0, ATLAS_KEY, FRAMES.star).setScale(0.72),
       makeText(this, 56, 4, `${book.count()}`, 40, '#21324a', true),
     ]);
     stars.setDepth(6);
-    this.layout.attach(stars, { kind: 'right', inset: 156 });
+    this.layout.attach(stars, { kind: 'right', inset: isPortrait ? 100 : 156 });
 
     // Sound toggle (phonics audio on/off), pinned inside the live left edge.
     const muted = this.registry.get('muted') === true;
-    makeEdgeIconButton(this, this.layout, {
+    const speaker = makeEdgeIconButton(this, this.layout, {
       edge: 'left',
-      inset: 92,
-      y: BANDS.headerCenterY,
+      inset: isPortrait ? 80 : 92,
+      y: isPortrait ? PORTRAIT_BANDS.headerCenterY : BANDS.headerCenterY,
       frame: FRAMES.speaker,
-      // No click SFX on purpose: this handler RESTARTS the scene, whose shutdown
-      // releases the audio pool and would truncate the click it just started.
       onClick: (): void => {
         const next = !(this.registry.get('muted') === true);
         this.registry.set('muted', next);
         this.scene.restart();
       },
     });
+
+    let mutedLabel: Phaser.GameObjects.Text | null = null;
     if (muted) {
-      const label = makeText(this, 0, 176, 'muted', 22, '#c24848', true);
-      this.layout.attach(label, { kind: 'left', inset: 92 });
+      mutedLabel = makeText(this, 0, isPortrait ? 158 : 176, 'muted', 22, '#c24848', true);
+      this.layout.attach(mutedLabel, { kind: 'left', inset: isPortrait ? 80 : 92 });
     }
+
+    // Adaptive orientation layout handler
+    this.layout.onStageChange((stage: StageMetrics) => {
+      const portrait = stage.isPortrait;
+      const cx = stage.centreX;
+
+      wordmark.setPosition(cx, portrait ? 260 : 150);
+      wordmark.setFontSize(portrait ? 92 : 104);
+      subtitle.setPosition(cx, portrait ? 350 : 226);
+      subtitle.setFontSize(portrait ? 32 : 34);
+
+      playBtn.setPosition(cx, portrait ? 530 : 354);
+      wordbookBtn.setPosition(cx, portrait ? 690 : 514);
+
+      this.layout.setAnchorY(stars, portrait ? 80 : 92);
+      this.layout.setAnchorY(
+        speaker,
+        portrait ? PORTRAIT_BANDS.headerCenterY : BANDS.headerCenterY,
+      );
+      if (mutedLabel) {
+        this.layout.setAnchorY(mutedLabel, portrait ? 158 : 176);
+      }
+    });
   }
 
   private startGame(): void {
@@ -113,26 +158,55 @@ export class MenuScene extends Phaser.Scene {
    */
   private addFloatingTiles(): void {
     const units = ['W', 'B', 'L', 'O', 'C'];
-    const y = ISLAND_CENTRE_Y + 720 / 2 - 68;
+    const getBaseY = (stage: StageMetrics): number =>
+      stage.isPortrait ? stage.centreY + 400 : stage.centreY + 360 - 68;
+
+    let currentBaseY = getBaseY(this.layout.metrics);
 
     const tiles = units.map((unit, index) => {
-      const tile = this.add.image(0, y, ATLAS_KEY, 'tile_w1').setScale(0.78).setAlpha(0.92);
+      const tile = this.add
+        .image(0, currentBaseY, ATLAS_KEY, 'tile_w1')
+        .setScale(0.78)
+        .setAlpha(0.92);
       tile.setDepth(1);
-      const label = makeText(this, 0, y - 6, unit, 48, '#3a2a00', true);
+      const label = makeText(this, 0, currentBaseY - 6, unit, 48, '#3a2a00', true);
       label.setDepth(2);
-      this.tweens.add({
+      let tween = this.tweens.add({
         targets: [tile, label],
-        y: y - 8,
+        y: currentBaseY - 8,
         duration: 1400 + index * 130,
         yoyo: true,
         repeat: -1,
         ease: 'Sine.InOut',
       });
-      return { tile, label, index };
+      return {
+        tile,
+        label,
+        index,
+        setBaseY: (newY: number): void => {
+          tween.remove();
+          tile.y = newY;
+          label.y = newY - 6;
+          tween = this.tweens.add({
+            targets: [tile, label],
+            y: newY - 8,
+            duration: 1400 + index * 130,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.InOut',
+          });
+        },
+      };
     });
 
     const place = (stage: StageMetrics): void => {
-      const span = Math.min(stage.width, 1280);
+      const targetBaseY = getBaseY(stage);
+      if (Math.abs(targetBaseY - currentBaseY) > 1) {
+        currentBaseY = targetBaseY;
+        tiles.forEach((t) => t.setBaseY(currentBaseY));
+      }
+
+      const span = Math.min(stage.width, stage.isPortrait ? 680 : 1280);
       const step = span / (units.length + 1);
       tiles.forEach(({ tile, label, index }) => {
         const x = stage.left + (stage.width - span) / 2 + step * (index + 1);
@@ -142,7 +216,7 @@ export class MenuScene extends Phaser.Scene {
     };
 
     place(this.layout.metrics);
-    // Frames must not be re-created: only x is written, on objects that exist.
+    // Frames must not be re-created: only x and y are updated on existing objects.
     this.layout.onStageChange(place);
   }
 }
