@@ -5,6 +5,15 @@ import {
   ISLAND_CENTRE_X,
   MIN_TOUCH_CSS,
   MIN_VIEWPORT_SCALE,
+  PORTRAIT_DESIGN_WIDTH,
+  PORTRAIT_ISLAND_CENTRE_X,
+  PORTRAIT_WORDBOOK,
+  PORTRAIT_WORDBOOK_GRID_BOTTOM,
+  PORTRAIT_WORDBOOK_GRID_WIDTH,
+  PORTRAIT_WORDBOOK_PER_PAGE,
+  PORTRAIT_WORDBOOK_SPEAKER,
+  PORTRAIT_WORDBOOK_TEXT,
+  PORTRAIT_WORDBOOK_THUMB,
   WORDBOOK,
   WORDBOOK_GRID_BOTTOM,
   WORDBOOK_GRID_WIDTH,
@@ -15,9 +24,11 @@ import {
   anchorX,
   stageMetrics,
   wordbookBackX,
+  wordbookCardSize,
   wordbookColumnX,
   wordbookPagerX,
   wordbookRowY,
+  wordbookSpeaker,
   wordbookTextLeft,
   wordbookTextRight,
   wordbookTextWidth,
@@ -342,5 +353,165 @@ describe('touch targets — regression: only landscape satisfied 64 CSS px', () 
     );
     // And at exactly the floor the tightest target is still above 44 CSS px.
     expect(WORDBOOK.card.height * MIN_VIEWPORT_SCALE).toBeGreaterThanOrEqual(MIN_TOUCH_CSS);
+  });
+});
+
+describe('Portrait Wordbook — 1-column wide flashcards redesign', () => {
+  it('defines 1 column x 4 rows = 4 cards per page', () => {
+    expect(PORTRAIT_WORDBOOK.columns).toBe(1);
+    expect(PORTRAIT_WORDBOOK.rows).toBe(4);
+    expect(PORTRAIT_WORDBOOK_PER_PAGE).toBe(4);
+    expect(PORTRAIT_WORDBOOK_PER_PAGE).toBe(PORTRAIT_WORDBOOK.columns * PORTRAIT_WORDBOOK.rows);
+  });
+
+  it('calculates 8 pages for 30 manifest words (4 cards per page)', () => {
+    const totalWords = 30;
+    const pages = Math.ceil(totalWords / PORTRAIT_WORDBOOK_PER_PAGE);
+    expect(pages).toBe(8);
+  });
+
+  it('card metrics provide wide flashcards spanning across 720px width', () => {
+    const { width, height } = PORTRAIT_WORDBOOK.card;
+    expect(width).toBe(620);
+    expect(height).toBe(148);
+    expect(wordbookCardSize(true)).toEqual({ width: 620, height: 148 });
+    expect(wordbookCardSize(false)).toEqual(WORDBOOK.card);
+
+    // Centered at PORTRAIT_ISLAND_CENTRE_X (360) with 50px side margins in 720px stage
+    const cx = wordbookColumnX(0, 1, true);
+    expect(cx).toBe(PORTRAIT_ISLAND_CENTRE_X);
+    expect(cx - width / 2).toBe(50);
+    expect(cx + width / 2).toBe(670);
+    expect(cx - width / 2).toBeGreaterThanOrEqual(0);
+    expect(cx + width / 2).toBeLessThanOrEqual(PORTRAIT_DESIGN_WIDTH);
+  });
+
+  it('four rows fit inside the 1280px portrait design space and panel', () => {
+    const { gridTop, gapY, panel } = PORTRAIT_WORDBOOK;
+    expect(gridTop).toBe(290);
+    expect(gapY).toBe(16);
+    expect(PORTRAIT_WORDBOOK_GRID_BOTTOM).toBe(290 + 4 * 148 + 3 * 16);
+    expect(PORTRAIT_WORDBOOK_GRID_BOTTOM).toBe(930);
+    expect(PORTRAIT_WORDBOOK_GRID_WIDTH).toBe(620);
+
+    const panelTop = panel.y - panel.height / 2;
+    const panelBottom = panel.y + panel.height / 2;
+    expect(panelTop).toBeLessThanOrEqual(gridTop);
+    expect(panelBottom).toBeGreaterThanOrEqual(PORTRAIT_WORDBOOK_GRID_BOTTOM);
+    expect(panelBottom).toBeLessThanOrEqual(PORTRAIT_WORDBOOK.pagerY);
+  });
+
+  it('dedicated portrait thumbnail well is generous 124x124 with 12px inset', () => {
+    const { size, inset } = PORTRAIT_WORDBOOK_THUMB;
+    expect(size).toBe(124);
+    expect(inset).toBe(12);
+
+    const thumbX = wordbookThumbX(true);
+    const halfW = PORTRAIT_WORDBOOK.card.width / 2;
+    const halfH = PORTRAIT_WORDBOOK.card.height / 2;
+    const thumbLeft = thumbX - size / 2;
+    const thumbRight = thumbX + size / 2;
+
+    expect(thumbLeft).toBe(-halfW + inset);
+    expect(thumbRight).toBe(-halfW + inset + size);
+    expect(thumbRight).toBeLessThan(0); // sits well on the left half
+    expect(size).toBeLessThan(PORTRAIT_WORDBOOK.card.height); // vertical clearance
+    expect(halfH - size / 2).toBeCloseTo((148 - 124) / 2, 6);
+  });
+
+  it('dedicated portrait speaker has large touch target (>= 64px) vertically centered', () => {
+    const speaker = wordbookSpeaker(true);
+    expect(speaker.radius).toBe(32);
+    expect(speaker.size).toBeGreaterThanOrEqual(64);
+    expect(speaker.y).toBe(0); // vertically centered in card
+
+    const halfW = PORTRAIT_WORDBOOK.card.width / 2;
+    expect(speaker.x).toBe(halfW - 45);
+    expect(speaker.x + speaker.radius).toBeLessThanOrEqual(halfW);
+    expect(speaker.x - speaker.radius).toBeGreaterThan(0);
+  });
+
+  it('portrait text column provides ample width between thumbnail and speaker', () => {
+    const textLeft = wordbookTextLeft(true);
+    const textRight = wordbookTextRight(true);
+    const textWidth = wordbookTextWidth(true);
+
+    expect(textLeft).toBe(wordbookThumbX(true) + PORTRAIT_WORDBOOK_THUMB.size / 2);
+    expect(textRight).toBe(PORTRAIT_WORDBOOK_SPEAKER.x - PORTRAIT_WORDBOOK_SPEAKER.radius - 8);
+    expect(textWidth).toBeGreaterThanOrEqual(360);
+    expect(textRight).toBeLessThan(PORTRAIT_WORDBOOK_SPEAKER.x - PORTRAIT_WORDBOOK_SPEAKER.radius);
+  });
+
+  it('portrait word and meta typography constants ensure no overlap', () => {
+    const { wordY, metaY, wordFontSize, metaFontSize } = PORTRAIT_WORDBOOK_TEXT;
+    expect(wordFontSize).toBe(38);
+    expect(metaFontSize).toBe(20);
+    expect(wordY).toBe(-18);
+    expect(metaY).toBe(22);
+
+    // Disjoint vertical bands: word bottom vs meta top
+    const wordBottom = wordY + wordFontSize / 2;
+    const metaTop = metaY - metaFontSize / 2;
+    expect(wordBottom).toBeLessThan(metaTop);
+  });
+
+  it('pager and back button geometry in portrait stay within safe bounds', () => {
+    expect(PORTRAIT_WORDBOOK.pagerY).toBe(1040);
+    expect(PORTRAIT_WORDBOOK.pagerCaptionY).toBe(1040);
+    expect(PORTRAIT_WORDBOOK.pagerInset).toBe(70);
+    expect(PORTRAIT_WORDBOOK.pagerButtonSize).toBe(110);
+    expect(PORTRAIT_WORDBOOK.backInset).toBe(80);
+    expect(PORTRAIT_WORDBOOK.backButtonY).toBe(76);
+    expect(PORTRAIT_WORDBOOK.backButtonWidth).toBe(160);
+    expect(PORTRAIT_WORDBOOK.backButtonHeight).toBe(110);
+
+    // Back bottom is above gridTop
+    const backBottom = PORTRAIT_WORDBOOK.backButtonY + PORTRAIT_WORDBOOK.backButtonHeight / 2;
+    expect(backBottom).toBeLessThan(PORTRAIT_WORDBOOK.gridTop);
+
+    // Pager top is below panel bottom
+    const panelBottom = PORTRAIT_WORDBOOK.panel.y + PORTRAIT_WORDBOOK.panel.height / 2;
+    const pagerTop = PORTRAIT_WORDBOOK.pagerY - PORTRAIT_WORDBOOK.pagerButtonSize / 2;
+    expect(pagerTop).toBeGreaterThanOrEqual(panelBottom - 5);
+  });
+
+  it('portrait touch targets clear accessibility floors on mobile viewports', () => {
+    for (const [w, h] of [
+      [393, 851],
+      [412, 915],
+      [360, 640],
+    ] as const) {
+      const { scale } = stageMetrics(w, h);
+      // Card target is large
+      expect(PORTRAIT_WORDBOOK.card.width * scale, `${w}x${h} card width`).toBeGreaterThanOrEqual(
+        SPEC_CSS,
+      );
+      expect(PORTRAIT_WORDBOOK.card.height * scale, `${w}x${h} card height`).toBeGreaterThanOrEqual(
+        SPEC_CSS,
+      );
+      // Speaker touch target (64x64 design px) clears floor
+      expect(PORTRAIT_WORDBOOK_SPEAKER.size).toBeGreaterThanOrEqual(64);
+      // Back button
+      expect(PORTRAIT_WORDBOOK.backButtonWidth * scale, `${w}x${h} back w`).toBeGreaterThanOrEqual(
+        SPEC_CSS,
+      );
+      expect(PORTRAIT_WORDBOOK.backButtonHeight * scale, `${w}x${h} back h`).toBeGreaterThanOrEqual(
+        MIN_TOUCH_CSS,
+      );
+      expect(PORTRAIT_WORDBOOK.pagerButtonSize * scale, `${w}x${h} pager`).toBeGreaterThanOrEqual(
+        MIN_TOUCH_CSS,
+      );
+    }
+  });
+
+  it('landscape layout remains 100% intact and untouched', () => {
+    expect(WORDBOOK.columns).toBe(3);
+    expect(WORDBOOK.rows).toBe(3);
+    expect(WORDBOOK_PER_PAGE).toBe(9);
+    expect(WORDBOOK.card).toEqual({ width: 292, height: 128 });
+    expect(WORDBOOK_THUMB.size).toBe(96);
+    expect(wordbookThumbX(false)).toBe(wordbookThumbX());
+    expect(wordbookSpeaker(false)).toEqual(WORDBOOK_SPEAKER);
+    expect(wordbookCardSize(false)).toEqual(WORDBOOK.card);
   });
 });

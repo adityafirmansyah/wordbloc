@@ -522,24 +522,45 @@ export const WORDBOOK_PER_PAGE = WORDBOOK.columns * WORDBOOK.rows;
  * 2 columns x 4 rows = 8 cards per page with comfortable padding.
  */
 export const PORTRAIT_WORDBOOK = {
-  columns: 2,
+  columns: 1,
   rows: 4,
-  gridTop: 310,
-  card: { width: 292, height: 128 },
+  gridTop: 290,
+  card: { width: 620, height: 148 },
   gapX: 16,
-  gapY: 14,
-  pagerY: 940,
-  pagerInset: 60,
+  gapY: 16,
+  pagerY: 1040,
+  pagerInset: 70,
   pagerButtonSize: 110,
-  pagerCaptionY: 940,
+  pagerCaptionY: 1040,
   backInset: 80,
   backButtonY: 76,
   backButtonWidth: 160,
   backButtonHeight: 110,
-  panel: { y: 620, width: 660, height: 760 },
+  panel: { y: 620, width: 660, height: 740 },
 } as const;
 
 export const PORTRAIT_WORDBOOK_PER_PAGE = PORTRAIT_WORDBOOK.columns * PORTRAIT_WORDBOOK.rows;
+
+/**
+ * Dedicated Portrait Card Layout Constants (1-column wide flashcard).
+ */
+export const PORTRAIT_WORDBOOK_THUMB = { size: 124, inset: 12 } as const;
+
+export const PORTRAIT_WORDBOOK_SPEAKER = {
+  x: 620 / 2 - 45,
+  y: 0,
+  radius: 32,
+  size: 64,
+} as const;
+
+export const PORTRAIT_WORDBOOK_TEXT = {
+  wordX: -40,
+  wordY: -18,
+  metaX: -40,
+  metaY: 22,
+  wordFontSize: 38,
+  metaFontSize: 20,
+} as const;
 
 /**
  * Card thumbnail geometry (design px) for the real illustration on each card.
@@ -568,38 +589,72 @@ export const PORTRAIT_WORDBOOK_PER_PAGE = PORTRAIT_WORDBOOK.columns * PORTRAIT_W
  */
 export const WORDBOOK_THUMB = { size: 96, inset: 12 } as const;
 
+/** Card dimensions for landscape or portrait. */
+export function wordbookCardSize(isPortrait = false): { width: number; height: number } {
+  return isPortrait ? PORTRAIT_WORDBOOK.card : WORDBOOK.card;
+}
+
 /** Card-relative x of the thumbnail centre (negative = left of the card centre). */
-export function wordbookThumbX(): number {
+export function wordbookThumbX(isPortrait = false): number {
+  if (isPortrait) {
+    return (
+      -PORTRAIT_WORDBOOK.card.width / 2 +
+      PORTRAIT_WORDBOOK_THUMB.inset +
+      PORTRAIT_WORDBOOK_THUMB.size / 2
+    );
+  }
   return -WORDBOOK.card.width / 2 + WORDBOOK_THUMB.inset + WORDBOOK_THUMB.size / 2;
 }
 
-/** Card-relative centre of the replay speaker (bottom-right corner). */
+/** Card-relative centre of the replay speaker (bottom-right corner in landscape, right edge in portrait). */
 export const WORDBOOK_SPEAKER = {
   x: WORDBOOK.card.width / 2 - 30,
   y: WORDBOOK.card.height / 2 - 30,
   radius: 22,
+  size: 44,
 } as const;
+
+/** Card-relative centre and size of the replay speaker. */
+export function wordbookSpeaker(isPortrait = false): {
+  x: number;
+  y: number;
+  radius: number;
+  size: number;
+} {
+  return isPortrait ? PORTRAIT_WORDBOOK_SPEAKER : WORDBOOK_SPEAKER;
+}
 
 /** Gap between the text column and the speaker circle, design px. */
 export const WORDBOOK_TEXT_GAP = 8;
 
 /** Card-relative x where the text column starts (right edge of the thumb well). */
-export function wordbookTextLeft(): number {
+export function wordbookTextLeft(isPortrait = false): number {
+  if (isPortrait) {
+    return (
+      -PORTRAIT_WORDBOOK.card.width / 2 +
+      PORTRAIT_WORDBOOK_THUMB.inset +
+      PORTRAIT_WORDBOOK_THUMB.size
+    );
+  }
   return -WORDBOOK.card.width / 2 + WORDBOOK_THUMB.inset + WORDBOOK_THUMB.size;
 }
 
 /** Card-relative x where the text column ends (clear of the speaker circle). */
-export function wordbookTextRight(): number {
-  return WORDBOOK_SPEAKER.x - WORDBOOK_SPEAKER.radius - WORDBOOK_TEXT_GAP;
+export function wordbookTextRight(isPortrait = false): number {
+  const speaker = wordbookSpeaker(isPortrait);
+  return speaker.x - speaker.radius - WORDBOOK_TEXT_GAP;
 }
 
 /** Width of the text column, used as the word label's wrap width. */
-export function wordbookTextWidth(): number {
-  return wordbookTextRight() - wordbookTextLeft();
+export function wordbookTextWidth(isPortrait = false): number {
+  return wordbookTextRight(isPortrait) - wordbookTextLeft(isPortrait);
 }
 
 /** Card-relative x centre of the word label. */
-export function wordbookWordX(): number {
+export function wordbookWordX(isPortrait = false): number {
+  if (isPortrait) {
+    return PORTRAIT_WORDBOOK_TEXT.wordX;
+  }
   return (wordbookTextLeft() + wordbookTextRight()) / 2;
 }
 
@@ -613,6 +668,17 @@ export const WORDBOOK_GRID_BOTTOM =
 /** Full width of a centred grid row, in design px. */
 export const WORDBOOK_GRID_WIDTH =
   WORDBOOK.columns * WORDBOOK.card.width + (WORDBOOK.columns - 1) * WORDBOOK.gapX;
+
+/** Bottom edge of the last grid row in portrait, in design px. */
+export const PORTRAIT_WORDBOOK_GRID_BOTTOM =
+  PORTRAIT_WORDBOOK.gridTop +
+  PORTRAIT_WORDBOOK.rows * PORTRAIT_WORDBOOK.card.height +
+  (PORTRAIT_WORDBOOK.rows - 1) * PORTRAIT_WORDBOOK.gapY;
+
+/** Full width of a centred grid row in portrait, in design px. */
+export const PORTRAIT_WORDBOOK_GRID_WIDTH =
+  PORTRAIT_WORDBOOK.columns * PORTRAIT_WORDBOOK.card.width +
+  (PORTRAIT_WORDBOOK.columns - 1) * PORTRAIT_WORDBOOK.gapX;
 
 /** x of the column `col` centre (0-based), centred on the content island. */
 export function wordbookColumnX(
