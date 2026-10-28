@@ -38,7 +38,7 @@ import { createCoalescer, type Coalescer } from './frameCoalesce';
 interface AnchorEntry {
   target: { x: number; y: number; active?: boolean; scene?: unknown };
   anchor: StageAnchor;
-  y: number;
+  y: number | ((stage: StageMetrics) => number);
 }
 
 /** Full-bleed background: vertical gradient stretched over the whole stage. */
@@ -116,14 +116,33 @@ export class StageLayout {
     return this.stage;
   }
 
-  /** Keep `target` at `anchor` horizontally, at its current y. */
+  /** Keep `target` at `anchor` horizontally, at its current y (or computed y). */
   attach<T extends { x: number; y: number; active?: boolean }>(
     target: T,
     anchor: StageAnchor = { kind: 'centre' },
+    y?: number | ((stage: StageMetrics) => number),
   ): T {
-    this.anchored.push({ target, anchor, y: target.y });
+    const resolvedY = y !== undefined ? y : target.y;
+    this.anchored.push({ target, anchor, y: resolvedY });
     target.x = anchorX(this.stage, anchor);
+    if (typeof resolvedY === 'function') {
+      target.y = resolvedY(this.stage);
+    } else {
+      target.y = resolvedY;
+    }
     return target;
+  }
+
+  /** Update an anchored target's y position / y calculator. */
+  setAnchorY(
+    target: { x: number; y: number },
+    y: number | ((stage: StageMetrics) => number),
+  ): void {
+    const entry = this.anchored.find((e) => e.target === target);
+    if (entry) {
+      entry.y = y;
+      entry.target.y = typeof y === 'function' ? y(this.stage) : y;
+    }
   }
 
   /** Run `cb` on every stage change (after the built-in re-anchoring). */
@@ -146,7 +165,11 @@ export class StageLayout {
         continue;
       }
       entry.target.x = anchorX(this.stage, entry.anchor);
-      entry.target.y = entry.y;
+      if (typeof entry.y === 'function') {
+        entry.target.y = entry.y(this.stage);
+      } else {
+        entry.target.y = entry.y;
+      }
     }
 
     for (const cb of this.listeners) cb(this.stage);
@@ -156,7 +179,7 @@ export class StageLayout {
     const cam = this.scene.cameras.main;
     // A zero-area viewport cannot be zoomed; 1 keeps the camera usable meanwhile.
     cam.setZoom(this.stage.scale > 0 ? this.stage.scale : 1);
-    cam.centerOn(ISLAND_CENTRE_X, ISLAND_CENTRE_Y);
+    cam.centerOn(this.stage.centreX, this.stage.centreY);
   }
 
   /**

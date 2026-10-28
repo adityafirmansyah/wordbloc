@@ -7,6 +7,11 @@ import {
   HEADER_BUTTON_SIZE,
   MIN_TOUCH_CSS,
   MIN_VIEWPORT_SCALE,
+  PORTRAIT_BANDS,
+  PORTRAIT_DESIGN_HEIGHT,
+  PORTRAIT_DESIGN_WIDTH,
+  PORTRAIT_ISLAND_CENTRE_X,
+  PORTRAIT_ISLAND_CENTRE_Y,
   TILE_HEIGHT,
   bucketDesignWidth,
   chunkFrameFor,
@@ -16,6 +21,7 @@ import {
   stageMetrics,
   tileFrameFor,
   tileWidth,
+  viewportFit,
 } from '../src/game/theme';
 
 /**
@@ -169,5 +175,61 @@ describe('design space', () => {
         expect(value).toBeLessThanOrEqual(DESIGN_HEIGHT);
       }
     }
+  });
+});
+
+describe('portrait design space & stage metrics', () => {
+  it('is 720x1280 centred at (360, 640)', () => {
+    expect(PORTRAIT_DESIGN_WIDTH).toBe(720);
+    expect(PORTRAIT_DESIGN_HEIGHT).toBe(1280);
+    expect(PORTRAIT_ISLAND_CENTRE_X).toBe(360);
+    expect(PORTRAIT_ISLAND_CENTRE_Y).toBe(640);
+  });
+
+  it('keeps every portrait band inside the design height', () => {
+    for (const [, value] of Object.entries(PORTRAIT_BANDS)) {
+      if (typeof value === 'number' && !value.toString().includes('Button')) {
+        expect(value).toBeLessThanOrEqual(PORTRAIT_DESIGN_HEIGHT);
+      }
+    }
+  });
+
+  it('detects orientation correctly via stageMetrics', () => {
+    const portrait = stageMetrics(393, 851);
+    expect(portrait.isPortrait).toBe(true);
+    expect(portrait.orientation).toBe('portrait');
+    expect(portrait.centreX).toBe(PORTRAIT_ISLAND_CENTRE_X);
+    expect(portrait.centreY).toBe(PORTRAIT_ISLAND_CENTRE_Y);
+
+    const landscape = stageMetrics(851, 393);
+    expect(landscape.isPortrait).toBe(false);
+    expect(landscape.orientation).toBe('landscape');
+  });
+
+  it('accepts portrait viewports in viewportFit without rotate notice', () => {
+    const fit = viewportFit(393, 851);
+    expect(fit.notice).toBe('none');
+    expect(fit.scale).toBeGreaterThanOrEqual(MIN_VIEWPORT_SCALE);
+  });
+});
+
+describe('portrait touch targets', () => {
+  it('under typical phone portrait (e.g. 393x851 CSS px), scale is ~0.546 and targets are >= 64 CSS px', () => {
+    const stage = stageMetrics(393, 851);
+    const scale = stage.scale;
+    expect(scale).toBeCloseTo(393 / 720, 3);
+    expect(scale).toBeGreaterThan(0.54);
+
+    // Letter tile (128x144 design px): at scale ~0.546, ~69.9 x 78.6 CSS px (huge & kid-friendly)
+    expect(tileWidth('X') * scale).toBeGreaterThanOrEqual(SPEC_CSS);
+    expect(TILE_HEIGHT * scale).toBeGreaterThanOrEqual(SPEC_CSS);
+
+    // Primary buttons (340x128 design px)
+    expect(BUTTON_SIZE.width * scale).toBeGreaterThanOrEqual(SPEC_CSS);
+    expect(BUTTON_SIZE.height * scale).toBeGreaterThanOrEqual(SPEC_CSS);
+
+    // Header buttons (128x128 design px)
+    expect(HEADER_BUTTON_SIZE.width * scale).toBeGreaterThanOrEqual(SPEC_CSS);
+    expect(HEADER_BUTTON_SIZE.height * scale).toBeGreaterThanOrEqual(SPEC_CSS);
   });
 });

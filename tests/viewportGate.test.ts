@@ -86,11 +86,11 @@ describe('viewportFit', () => {
     expect(144 * fit.scale).toBeGreaterThanOrEqual(44);
   });
 
-  it('asks a portrait phone to rotate', () => {
+  it('accepts portrait phones as playable without rotating', () => {
     for (const [w, h] of PORTRAIT) {
       const fit = viewportFit(w, h);
-      expect(fit.notice, `${w}x${h}`).toBe('rotate');
-      expect(fit.scale).toBeLessThan(MIN_VIEWPORT_SCALE);
+      expect(fit.notice, `${w}x${h}`).toBe('none');
+      expect(fit.scale, `${w}x${h}`).toBeGreaterThanOrEqual(MIN_VIEWPORT_SCALE);
     }
   });
 
@@ -133,7 +133,7 @@ describe('notice copy', () => {
   });
 
   it('returns readable, non-empty copy for each blocking state', () => {
-    expect(noticeFor(375, 667)).toEqual(NOTICE_COPY.rotate);
+    expect(noticeFor(200, 200)).toEqual(NOTICE_COPY['too-small']);
     expect(noticeFor(400, 300)).toEqual(NOTICE_COPY['too-small']);
     for (const copy of Object.values(NOTICE_COPY)) {
       expect(copy.title.length).toBeGreaterThan(0);
@@ -209,13 +209,20 @@ describe('applyViewportNotice (DOM wiring)', () => {
 });
 
 describe('gateCurrentViewport', () => {
-  it('blocks a portrait phone and allows landscape', () => {
+  it('allows both portrait and landscape phones as playable', () => {
     makeDoc();
     expect(gateCurrentViewport({ innerWidth: 375, innerHeight: 667, document } as never)).toBe(
-      false,
+      true,
     );
     expect(gateCurrentViewport({ innerWidth: 1280, innerHeight: 720, document } as never)).toBe(
       true,
+    );
+  });
+
+  it('blocks a genuinely too-small window in both dimensions', () => {
+    makeDoc();
+    expect(gateCurrentViewport({ innerWidth: 200, innerHeight: 200, document } as never)).toBe(
+      false,
     );
   });
 
@@ -291,12 +298,12 @@ describe('wireViewportGate (boot wiring)', () => {
     const originalWidth = win.innerWidth;
     const originalHeight = win.innerHeight;
 
-    // jsdom's window starts at 1024x768 (playable), so boot into a portrait phone.
-    Object.defineProperty(win, 'innerWidth', { value: 375, configurable: true });
-    Object.defineProperty(win, 'innerHeight', { value: 667, configurable: true });
+    // jsdom's window starts at 1024x768 (playable), so boot into a tiny window.
+    Object.defineProperty(win, 'innerWidth', { value: 200, configurable: true });
+    Object.defineProperty(win, 'innerHeight', { value: 200, configurable: true });
 
     const wire = wireViewportGate(window);
-    // Booted at a portrait window -> blocked, notice visible, aria-hidden false.
+    // Booted at a tiny window -> blocked, notice visible, aria-hidden false.
     const box = document.getElementById(NOTICE_ELEMENT_ID);
     expect(box?.classList.contains('visible')).toBe(true);
     expect(box?.getAttribute('aria-hidden')).toBe('false');
@@ -310,8 +317,8 @@ describe('wireViewportGate (boot wiring)', () => {
 
     // Dispose unbinds: a further resize must not touch the DOM.
     wire.dispose();
-    Object.defineProperty(win, 'innerWidth', { value: 375, configurable: true });
-    Object.defineProperty(win, 'innerHeight', { value: 667, configurable: true });
+    Object.defineProperty(win, 'innerWidth', { value: 200, configurable: true });
+    Object.defineProperty(win, 'innerHeight', { value: 200, configurable: true });
     window.dispatchEvent(new Event('resize'));
     expect(box?.classList.contains('visible')).toBe(false);
 

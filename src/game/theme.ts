@@ -82,6 +82,16 @@ export const ISLAND_CENTRE_X = DESIGN_WIDTH / 2;
 export const ISLAND_CENTRE_Y = DESIGN_HEIGHT / 2;
 
 /**
+ * Portrait design space (720x1280).
+ * Centred at (360, 640).
+ */
+export const PORTRAIT_DESIGN_WIDTH = 720;
+export const PORTRAIT_DESIGN_HEIGHT = 1280;
+export const PORTRAIT_ISLAND_CENTRE_X = PORTRAIT_DESIGN_WIDTH / 2;
+export const PORTRAIT_ISLAND_CENTRE_Y = PORTRAIT_DESIGN_HEIGHT / 2;
+export const MIN_PORTRAIT_DESIGN_WIDTH = PORTRAIT_DESIGN_WIDTH;
+
+/**
  * Halo colour behind a level's illustration, one family per level `category`.
  *
  * The sticker pack is transparent-background WebP, so the clue needs a backing
@@ -149,9 +159,9 @@ export interface ViewportFit {
  * except `scale`, which converts world px to CSS px.
  */
 export interface StageMetrics {
-  /** Visible stage width; always >= MIN_DESIGN_WIDTH. */
+  /** Visible stage width; always >= MIN_DESIGN_WIDTH (or MIN_PORTRAIT_DESIGN_WIDTH). */
   width: number;
-  /** Visible stage height; always >= DESIGN_HEIGHT. */
+  /** Visible stage height; always >= DESIGN_HEIGHT (or PORTRAIT_DESIGN_HEIGHT). */
   height: number;
   /** World px -> CSS px factor (0 only for a degenerate 0-area viewport). */
   scale: number;
@@ -167,18 +177,42 @@ export interface StageMetrics {
   centreX: number;
   /** World y of the content island centre. */
   centreY: number;
+  /** True when vh > vw. */
+  isPortrait: boolean;
+  /** Current orientation regime. */
+  orientation: 'portrait' | 'landscape';
 }
 
 /**
  * The stage model. Pure: this is the single source of truth for how a viewport
  * maps onto the design space, used by the camera binding (src/ui/stage.ts), the
  * scenes, and the viewport gate.
+ *
+ * Supports dual-orientation adaptive layout:
+ * - Landscape (vw >= vh): base 1280x720, centred at (640, 360)
+ * - Portrait (vh > vw): base 720x1280, centred at (360, 640)
  */
 export function stageMetrics(viewportWidth: number, viewportHeight: number): StageMetrics {
   const vw = Number.isFinite(viewportWidth) && viewportWidth > 0 ? viewportWidth : 0;
   const vh = Number.isFinite(viewportHeight) && viewportHeight > 0 ? viewportHeight : 0;
+  const isPortrait = vh > vw;
 
   if (vw === 0 || vh === 0) {
+    if (isPortrait) {
+      return {
+        width: PORTRAIT_DESIGN_WIDTH,
+        height: PORTRAIT_DESIGN_HEIGHT,
+        scale: 0,
+        left: 0,
+        right: PORTRAIT_DESIGN_WIDTH,
+        top: 0,
+        bottom: PORTRAIT_DESIGN_HEIGHT,
+        centreX: PORTRAIT_ISLAND_CENTRE_X,
+        centreY: PORTRAIT_ISLAND_CENTRE_Y,
+        isPortrait: true,
+        orientation: 'portrait',
+      };
+    }
     // Degenerate viewport: describe the island so nothing divides by zero.
     return {
       width: MIN_DESIGN_WIDTH,
@@ -190,44 +224,46 @@ export function stageMetrics(viewportWidth: number, viewportHeight: number): Sta
       bottom: DESIGN_HEIGHT,
       centreX: ISLAND_CENTRE_X,
       centreY: ISLAND_CENTRE_Y,
+      isPortrait: false,
+      orientation: 'landscape',
     };
   }
 
-  const aspect = vw / vh;
-  const width = Math.max(MIN_DESIGN_WIDTH, DESIGN_HEIGHT * aspect);
-  const height = width / aspect;
-  const scale = vw / width;
+  const baseWidth = isPortrait ? PORTRAIT_DESIGN_WIDTH : DESIGN_WIDTH;
+  const baseHeight = isPortrait ? PORTRAIT_DESIGN_HEIGHT : DESIGN_HEIGHT;
+  const centreX = isPortrait ? PORTRAIT_ISLAND_CENTRE_X : ISLAND_CENTRE_X;
+  const centreY = isPortrait ? PORTRAIT_ISLAND_CENTRE_Y : ISLAND_CENTRE_Y;
+
+  const scale = Math.min(vw / baseWidth, vh / baseHeight);
+  const width = vw / scale;
+  const height = vh / scale;
 
   return {
     width,
     height,
     scale,
-    left: ISLAND_CENTRE_X - width / 2,
-    right: ISLAND_CENTRE_X + width / 2,
-    top: ISLAND_CENTRE_Y - height / 2,
-    bottom: ISLAND_CENTRE_Y + height / 2,
-    centreX: ISLAND_CENTRE_X,
-    centreY: ISLAND_CENTRE_Y,
+    left: centreX - width / 2,
+    right: centreX + width / 2,
+    top: centreY - height / 2,
+    bottom: centreY + height / 2,
+    centreX,
+    centreY,
+    isPortrait,
+    orientation: isPortrait ? 'portrait' : 'landscape',
   };
 }
 
 /**
  * Decides whether the stage can honour the 44 CSS px touch-target floor.
- * Below MIN_VIEWPORT_SCALE no design size can, so we ask the player to rotate
- * (portrait) or enlarge the window (landscape) instead of serving 36px buttons.
- *
- * Playability is checked FIRST, before orientation: a portrait tablet (768x1024,
- * scale 0.6) reaches the floor and is genuinely fine to play, so it must never be
- * told to rotate. Orientation only picks WHICH hint a blocked viewport shows:
- * portrait -> 'rotate' (the device has a sideways mode that fixes it), landscape
- * -> 'too-small' (only a bigger window helps).
+ * Below MIN_VIEWPORT_SCALE no design size can, so we report 'too-small'.
+ * Both portrait and landscape are first-class playable orientations.
  */
 export function viewportFit(width: number, height: number): ViewportFit {
   const scale = stageMetrics(width, height).scale;
   if (Number.isFinite(scale) && scale >= MIN_VIEWPORT_SCALE - 1e-9) {
     return { scale, notice: 'none' };
   }
-  return { scale, notice: height > width ? 'rotate' : 'too-small' };
+  return { scale, notice: 'too-small' };
 }
 
 export const COLORS = {
@@ -291,6 +327,7 @@ export const TRAY_GAP = 10;
 export const TRAY_ROW_GAP = 14;
 /** Maximum row width the tray may occupy before it wraps. */
 export const TRAY_MAX_WIDTH = 1180;
+export const PORTRAIT_TRAY_MAX_WIDTH = 680;
 
 /**
  * Magnetic drop zone, as extra design px around a slot's half width / half height.
@@ -481,6 +518,30 @@ export function anchorX(stage: StageMetrics, anchor: StageAnchor): number {
 export const WORDBOOK_PER_PAGE = WORDBOOK.columns * WORDBOOK.rows;
 
 /**
+ * Wordbook portrait screen geometry (design px, 720x1280).
+ * 2 columns x 4 rows = 8 cards per page with comfortable padding.
+ */
+export const PORTRAIT_WORDBOOK = {
+  columns: 2,
+  rows: 4,
+  gridTop: 310,
+  card: { width: 292, height: 128 },
+  gapX: 16,
+  gapY: 14,
+  pagerY: 940,
+  pagerInset: 60,
+  pagerButtonSize: 110,
+  pagerCaptionY: 940,
+  backInset: 80,
+  backButtonY: 76,
+  backButtonWidth: 160,
+  backButtonHeight: 110,
+  panel: { y: 620, width: 660, height: 760 },
+} as const;
+
+export const PORTRAIT_WORDBOOK_PER_PAGE = PORTRAIT_WORDBOOK.columns * PORTRAIT_WORDBOOK.rows;
+
+/**
  * Card thumbnail geometry (design px) for the real illustration on each card.
  *
  * A card is 292x128. The sticker sits in a SQUARE well on the LEFT (the pack is
@@ -554,12 +615,29 @@ export const WORDBOOK_GRID_WIDTH =
   WORDBOOK.columns * WORDBOOK.card.width + (WORDBOOK.columns - 1) * WORDBOOK.gapX;
 
 /** x of the column `col` centre (0-based), centred on the content island. */
-export function wordbookColumnX(col: number, columnsInRow: number = WORDBOOK.columns): number {
+export function wordbookColumnX(
+  col: number,
+  columnsInRow: number = WORDBOOK.columns,
+  isPortrait = false,
+): number {
+  if (isPortrait) {
+    return (
+      PORTRAIT_ISLAND_CENTRE_X +
+      (col - (columnsInRow - 1) / 2) * (PORTRAIT_WORDBOOK.card.width + PORTRAIT_WORDBOOK.gapX)
+    );
+  }
   return ISLAND_CENTRE_X + (col - (columnsInRow - 1) / 2) * (WORDBOOK.card.width + WORDBOOK.gapX);
 }
 
 /** y of the row `row` centre (0-based). */
-export function wordbookRowY(row: number): number {
+export function wordbookRowY(row: number, isPortrait = false): number {
+  if (isPortrait) {
+    return (
+      PORTRAIT_WORDBOOK.gridTop +
+      row * (PORTRAIT_WORDBOOK.card.height + PORTRAIT_WORDBOOK.gapY) +
+      PORTRAIT_WORDBOOK.card.height / 2
+    );
+  }
   return WORDBOOK.gridTop + row * (WORDBOOK.card.height + WORDBOOK.gapY) + WORDBOOK.card.height / 2;
 }
 
@@ -591,4 +669,19 @@ export const BANDS = {
   trayCenterY: 604,
   /** Bottom margin the tray must never cross. */
   safeBottom: 704,
+} as const;
+
+/** Vertical bands of the game scene in portrait, in design px (720x1280). */
+export const PORTRAIT_BANDS = {
+  headerCenterY: 80,
+  headerButton: HEADER_BUTTON_SIZE.width,
+  artCenterY: 330,
+  artSize: { width: 300, height: 300 },
+  artHaloRadius: 155,
+  mechanicY: 510,
+  hintY: 550,
+  slotsCenterY: 680,
+  slotHeight: TILE_HEIGHT,
+  trayCenterY: 1040,
+  safeBottom: 1220,
 } as const;

@@ -22,13 +22,15 @@ import {
   COLORS,
   FONT_FAMILY,
   FRAMES,
-  ISLAND_CENTRE_X,
+  PORTRAIT_BANDS,
+  PORTRAIT_TRAY_MAX_WIDTH,
   SCENES,
   SLOT_GAP,
   TILE_HEIGHT,
   TRAY_GAP,
   TRAY_MAX_WIDTH,
   TRAY_ROW_GAP,
+  anchorX,
   artHaloColor,
   chunkFrameFor,
   slotDoneFrameFor,
@@ -36,6 +38,7 @@ import {
   tileFrameFor,
   tileWidth,
   withinDropZone,
+  type StageMetrics,
 } from '../game/theme';
 import type { Level, Mechanic } from '../game/levelTypes';
 import { makeArtView } from '../ui/artView';
@@ -104,29 +107,31 @@ export class GameScene extends Phaser.Scene {
   /** True once the level's word has actually been heard from its MP3. */
   private introWordSpoken = false;
 
+  // Tracked game objects for responsive re-layout on orientation change
+  private backButton!: Phaser.GameObjects.Container;
+  private soundButton!: Phaser.GameObjects.Container;
+  private tierLabel!: Phaser.GameObjects.Text;
+  private levelLabel!: Phaser.GameObjects.Text;
+  private haloGraphics!: Phaser.GameObjects.Graphics;
+  private artInitial!: Phaser.GameObjects.Text;
+  private artImage!: Phaser.GameObjects.Image;
+  private mechanicText!: Phaser.GameObjects.Text;
+  private hintText: Phaser.GameObjects.Text | null = null;
+
   constructor() {
     super(SCENES.game);
   }
 
   init(data: GameSceneData): void {
-    // No level data is touched here: init() is synchronous and the puzzle file is
-    // a lazily-imported chunk, so the id is only recorded and resolved in create().
     this.requestedLevelId = data.levelId ?? 'lvl_0001';
   }
 
   create(): void {
     this.audio = new AudioManager();
     this.audio.setEnabled(this.registry.get('muted') !== true);
-    // Game juice: decode the five SFX buffers NOW, so the first tile drop of the
-    // session snaps with no fetch/decode gap. Decoding does not need a gesture
-    // (only starting a source does), so this is safe pre-unlock.
     this.audio.preloadSfx();
-    // Navigate away mid-clip and the word must stop: the pool is scene-scoped.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.audio.release());
 
-    // Full-bleed stage (camera zoom + centred content island). Everything below
-    // anchors to the island centre; only the header controls and decorations hug
-    // the live stage edges.
     this.layout = new StageLayout(this);
 
     this.slots = [];
@@ -138,8 +143,6 @@ export class GameScene extends Phaser.Scene {
     this.introWordSpoken = false;
     this.board = null;
 
-    // Unknown ids fall back to the first manifest entry, exactly as before, but
-    // without needing any level file in memory to decide.
     const entry = manifestEntryById(this.requestedLevelId) ?? levelManifest().levels[0];
     if (!entry) {
       throw new Error('WordBloc GameScene: the level manifest is empty.');
@@ -148,14 +151,14 @@ export class GameScene extends Phaser.Scene {
 
     this.drawLoading(entry.display);
     void this.loadRequestedLevel(entry.id);
+
+    this.layout.onStageChange((stage: StageMetrics) => {
+      this.repositionBoard(stage);
+    });
   }
 
   /**
    * Pulls the puzzle chunk and draws the board when it arrives.
-   *
-   * The scene stays responsive while the chunk loads (a short "Loading <word>"
-   * card covers the stage), and a load that resolves after the player has already
-   * navigated away is discarded via the token check.
    */
   private async loadRequestedLevel(id: string): Promise<void> {
     const token = (this.loadToken += 1);
@@ -173,22 +176,19 @@ export class GameScene extends Phaser.Scene {
     this.clearLoading();
     this.drawBoard();
 
-    // Warm the next level while this one is being played, so "Next" is instant.
     const upcoming = nextLevelManifest(id);
     if (upcoming) void preloadLevel(upcoming.id);
   }
 
   private showLoadFailure(error: unknown): void {
     console.error('WordBloc: level failed to load.', error);
-    // Drop the loading card first, or its "Loading…" text sits under the error.
     this.clearLoading();
 
-    // Keep the diagnostic detail but wrap it: a raw Vite import error carries a
-    // full asset URL and used to run 300+px off each side of the stage.
+    const cx = this.layout.metrics.centreX;
     const detail = error instanceof Error ? error.message : String(error);
-    makeText(this, ISLAND_CENTRE_X, 372, 'Could not load this level.', 34, '#c24848', true);
+    makeText(this, cx, 372, 'Could not load this level.', 34, '#c24848', true);
     this.add
-      .text(ISLAND_CENTRE_X, 416, detail, {
+      .text(cx, 416, detail, {
         fontFamily: FONT_FAMILY,
         fontSize: '22px',
         color: '#54708c',
@@ -201,8 +201,8 @@ export class GameScene extends Phaser.Scene {
 
     makeEdgeIconButton(this, this.layout, {
       edge: 'left',
-      inset: 92,
-      y: BANDS.trayCenterY,
+      inset: this.layout.metrics.isPortrait ? 80 : 92,
+      y: this.layout.metrics.isPortrait ? PORTRAIT_BANDS.trayCenterY : BANDS.trayCenterY,
       frame: FRAMES.home,
       size: 132,
       sfx: this.clickSfx,
@@ -214,19 +214,20 @@ export class GameScene extends Phaser.Scene {
 
   private drawLoading(display: string): void {
     this.board = this.add.container(0, 0);
+    const isPortrait = this.layout.metrics.isPortrait;
+    const cx = this.layout.metrics.centreX;
+    const cy = isPortrait ? 520 : 360;
 
-    const card = this.add.image(ISLAND_CENTRE_X, 360, ATLAS_KEY, FRAMES.panel);
+    const card = this.add.image(cx, cy, ATLAS_KEY, FRAMES.panel);
     card.setDisplaySize(520, 180);
     this.board.add(card);
-    this.board.add(makeText(this, ISLAND_CENTRE_X, 332, 'Loading…', 40, '#21324a', true));
-    this.board.add(makeText(this, ISLAND_CENTRE_X, 386, display, 30, '#7f95ab'));
+    this.board.add(makeText(this, cx, cy - 28, 'Loading…', 40, '#21324a', true));
+    this.board.add(makeText(this, cx, cy + 26, display, 30, '#7f95ab'));
 
-    // Escape hatch while the chunk is in flight: without it a stalled download
-    // would trap the player on a card with no controls at all.
     const home = makeEdgeIconButton(this, this.layout, {
       edge: 'left',
-      inset: 92,
-      y: BANDS.headerCenterY,
+      inset: isPortrait ? 80 : 92,
+      y: isPortrait ? PORTRAIT_BANDS.headerCenterY : BANDS.headerCenterY,
       frame: FRAMES.home,
       size: 132,
       sfx: this.clickSfx,
@@ -244,9 +245,6 @@ export class GameScene extends Phaser.Scene {
   private drawBoard(): void {
     this.filled = targetUnits(this.level).map(() => null);
 
-    // Start every clip this level needs BEFORE the first tile moves, so a
-    // placement speaks instantly instead of waiting on a fresh request. The
-    // explicit silent key is skipped inside audioKeysForLevel (no silent.mp3).
     this.audio.preload(audioKeysForLevel(this.level));
 
     this.drawHeader();
@@ -255,53 +253,29 @@ export class GameScene extends Phaser.Scene {
     this.buildSlots();
     this.buildTray();
 
-    // Drag wiring (pointer covers mouse, touch and pen). Movement is handled by
-    // each tile's DRAG event, so no global pointer-move listener is needed.
     this.input.on(Phaser.Input.Events.POINTER_UP, this.onPointerUp, this);
     this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, this.onPointerUp, this);
 
-    // Autoplay policy: the audio context starts suspended and only a gesture can
-    // start it, so the first touch unlocks it. Without this the FIRST tile of a
-    // session is silent (the context is still 'suspended' when it plays).
     this.input.once(Phaser.Input.Events.POINTER_DOWN, () => this.unlockAudio());
 
-    // Phrase the word once the scene settles. Pre-gesture this is usually blocked
-    // by the autoplay policy, which is why unlockAudio() re-speaks it.
     this.introWordSpoken = false;
     this.time.delayedCall(400, () => void this.speakIntroWord());
   }
 
-  /**
-   * Unlocks the audio context from the first gesture, then re-speaks the level's
-   * word if the pre-gesture attempt was swallowed by the autoplay policy.
-   *
-   * Measured: a freshly created AudioContext is 'suspended' and its resume() stays
-   * PENDING without a gesture, so the "play the word as the board appears" line is
-   * genuinely inaudible on the first level. Replaying it here is what makes the
-   * spec's step 1 ("show illustration + play word audio") true for a real player.
-   */
   private unlockAudio(): void {
     void this.audio.unlock().then(() => {
       if (!this.scene.isActive()) return;
-      // Unlocked: only replay if the arrival word never actually played.
       if (!this.introWordSpoken) void this.speakIntroWord();
     });
   }
 
-  /**
-   * Game-juice click handed to button builders. Reads the live `audio` field at
-   * call time (never captured), so a button created before a mute toggle or a
-   * scene restart always goes through the current manager. Never throws.
-   */
   private clickSfx = (key: SfxKey): void => {
     void this.audio.playSfx(key).catch(() => undefined);
   };
 
-  /** Speaks the level word once; records whether the FILE actually played. */
   private speakIntroWord(): Promise<void> {
     if (!this.level || this.introWordSpoken) return Promise.resolve();
     return this.audio.playWord(this.level.audio_word).then((result) => {
-      // A policy-blocked first attempt must not consume the one replay.
       if (result.outcome === 'file') this.introWordSpoken = true;
     });
   }
@@ -309,58 +283,54 @@ export class GameScene extends Phaser.Scene {
   // ---------------------------------------------------------------- chrome
 
   private drawHeader(): void {
-    // Header controls hug the LIVE stage edges: on a 2.17:1 phone stage a fixed
-    // x=92 would sit ~340px inside the frame in world space and drift out of it.
-    const back = makeEdgeIconButton(this, this.layout, {
+    const isPortrait = this.layout.metrics.isPortrait;
+    const cx = this.layout.metrics.centreX;
+    const bands = isPortrait ? PORTRAIT_BANDS : BANDS;
+    const inset = isPortrait ? 80 : 92;
+
+    this.backButton = makeEdgeIconButton(this, this.layout, {
       edge: 'left',
-      inset: 92,
-      y: BANDS.headerCenterY,
+      inset,
+      y: bands.headerCenterY,
       frame: FRAMES.home,
-      size: 132,
+      size: isPortrait ? 116 : 132,
       sfx: this.clickSfx,
       onClick: () => this.scene.start(SCENES.menu),
     });
-    back.setDepth(20);
+    this.backButton.setDepth(20);
 
     const muted = this.registry.get('muted') === true;
-    const sound = makeEdgeIconButton(this, this.layout, {
+    this.soundButton = makeEdgeIconButton(this, this.layout, {
       edge: 'right',
-      inset: 92,
-      y: BANDS.headerCenterY,
+      inset,
+      y: bands.headerCenterY,
       frame: muted ? FRAMES.lock : FRAMES.speaker,
-      size: 132,
-      onClick: () => this.toggleMute(sound),
+      size: isPortrait ? 116 : 132,
+      onClick: () => this.toggleMute(this.soundButton),
     });
-    sound.setDepth(20);
+    this.soundButton.setDepth(20);
+
     this.mutedLabel = makeText(this, 0, 158, 'muted', 20, '#c24848', true);
-    this.layout.attach(this.mutedLabel, { kind: 'right', inset: 92 });
+    this.layout.attach(this.mutedLabel, { kind: 'right', inset });
     this.mutedLabel.setDepth(20);
     this.mutedLabel.setVisible(muted);
 
     const tierLabel = `Tier ${this.level.tier}`;
-    makeText(this, ISLAND_CENTRE_X, BANDS.headerCenterY - 14, tierLabel, 30, '#54708c', true);
-    makeText(
+    this.tierLabel = makeText(this, cx, bands.headerCenterY - 14, tierLabel, 30, '#54708c', true);
+    this.levelLabel = makeText(
       this,
-      ISLAND_CENTRE_X,
-      BANDS.headerCenterY + 26,
+      cx,
+      bands.headerCenterY + 26,
       `Level ${manifestIndexOf(this.level.id) + 1} of ${this.registry.get('levelCount') ?? manifestCount()}`,
       24,
       '#7f95ab',
     );
   }
 
-  /**
-   * Mute toggle. Only flips the audio flag — it must NOT restart the scene:
-   * a kid who has assembled half a word and then mutes the sound would lose it
-   * (measured: filled ['C','A',null] came back [null,null,null]).
-   */
   private toggleMute(button: Phaser.GameObjects.Container): void {
     const next = !(this.registry.get('muted') === true);
     this.registry.set('muted', next);
     this.audio.setEnabled(!next);
-    // The mute button is the one control whose feedback IS the state change, so it
-    // deliberately takes no button click: the tap that unmutes clicks (sound is
-    // back), and the tap that mutes is silent (no truncated clip on the way out).
     if (!next) void this.audio.playSfx('sfx/click');
     const icon = button.getAt(1);
     if (icon instanceof Phaser.GameObjects.Image) {
@@ -369,35 +339,28 @@ export class GameScene extends Phaser.Scene {
     this.mutedLabel.setVisible(next);
   }
 
-  /**
-   * The word clue: the REAL 512x512 sticker from the art pack, on a soft halo so
-   * a transparent-background WebP still reads against the sky.
-   *
-   * The sticker loads asynchronously and the band is square (BANDS.artSize), so a
-   * slow file shows a tidy tinted disc instead of an empty gap — and a failed one
-   * keeps that disc plus the word's initial, which is the old placeholder. The
-   * initial is removed the moment the real texture lands, so the two never
-   * double-draw.
-   */
+  private paintHalo(x: number, y: number, radius: number): void {
+    this.haloGraphics.clear();
+    this.haloGraphics.fillStyle(artHaloColor(this.level.category), 1);
+    this.haloGraphics.fillCircle(x, y, radius);
+    this.haloGraphics.lineStyle(6, 0xffffff, 0.85);
+    this.haloGraphics.strokeCircle(x, y, radius);
+  }
+
   private drawArt(): void {
-    const { width } = BANDS.artSize;
-    // The level file's `image` ref is authoritative (it is what the pack was
-    // generated against); `imageKeyFor` is only for manifest-only surfaces.
+    const isPortrait = this.layout.metrics.isPortrait;
+    const cx = this.layout.metrics.centreX;
+    const bands = isPortrait ? PORTRAIT_BANDS : BANDS;
+    const { width } = bands.artSize;
     const imageKey = this.level.image;
 
-    // Halo: category-tinted disc, one colour family per category so a kid can
-    // start recognising that tigers and frogs live in the same world.
-    const halo = this.add.graphics().setDepth(1);
-    halo.fillStyle(artHaloColor(this.level.category), 1);
-    halo.fillCircle(ISLAND_CENTRE_X, BANDS.artCenterY, BANDS.artHaloRadius);
-    halo.lineStyle(6, 0xffffff, 0.85);
-    halo.strokeCircle(ISLAND_CENTRE_X, BANDS.artCenterY, BANDS.artHaloRadius);
+    this.haloGraphics = this.add.graphics().setDepth(1);
+    this.paintHalo(cx, bands.artCenterY, bands.artHaloRadius);
 
-    // Fallback letter, visible only until (or unless) the sticker arrives.
-    const initial = this.add
-      .text(ISLAND_CENTRE_X, BANDS.artCenterY, this.level.display.charAt(0).toUpperCase(), {
+    this.artInitial = this.add
+      .text(cx, bands.artCenterY, this.level.display.charAt(0).toUpperCase(), {
         fontFamily: FONT_FAMILY,
-        fontSize: '88px',
+        fontSize: isPortrait ? '130px' : '88px',
         color: '#21324a',
         fontStyle: 'bold',
       })
@@ -405,33 +368,33 @@ export class GameScene extends Phaser.Scene {
       .setDepth(2);
 
     const { image, ready } = makeArtView(this, {
-      x: ISLAND_CENTRE_X,
-      y: BANDS.artCenterY,
+      x: cx,
+      y: bands.artCenterY,
       size: width,
       imageKey,
       placeholderFrame: FRAMES.card,
     });
-    // The sticker is the clue, so it sits ABOVE the fallback letter: a partly
-    // transparent sticker must never let the initial show through it.
     image.setDepth(3);
-    // Hidden until the real texture lands; the halo + initial carry the band.
     image.setVisible(false);
+    this.artImage = image;
 
     void ready.then((ok) => {
       if (!this.scene.isActive()) return;
       if (ok) {
-        image.setVisible(true);
-        initial.setVisible(false);
+        this.artImage.setVisible(true);
+        this.artInitial.setVisible(false);
       } else {
-        // No sticker: the tinted halo + big initial IS the clue (v1 behaviour).
         console.warn(`WordBloc: illustration "${imageKey}" unavailable; drawing the initial.`);
       }
     });
   }
 
   private drawHint(): void {
+    const isPortrait = this.layout.metrics.isPortrait;
+    const cx = this.layout.metrics.centreX;
+    const bands = isPortrait ? PORTRAIT_BANDS : BANDS;
     if (this.level.hint) {
-      makeText(this, ISLAND_CENTRE_X, BANDS.hintY, this.level.hint, 28, '#54708c');
+      this.hintText = makeText(this, cx, bands.hintY, this.level.hint, 28, '#54708c');
     }
   }
 
@@ -452,25 +415,79 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private buildSlots(): void {
+  /**
+   * Computes slot positions adaptively:
+   * In landscape: single centred row at BANDS.slotsCenterY.
+   * In portrait: if units <= 5, 1 row at PORTRAIT_BANDS.slotsCenterY.
+   *              if units > 5 (e.g. 8-letter words like ELEPHANT), wrap into 2 rows.
+   */
+  private computeSlotPositions(
+    isPortrait: boolean,
+    cx: number,
+  ): { x: number; y: number; width: number }[] {
     const units = targetUnits(this.level);
     const widths = units.map((unit) => tileWidth(unit.unit));
-    const total =
-      widths.reduce<number>((acc, w) => acc + w, 0) + SLOT_GAP * Math.max(0, units.length - 1);
-    // Centred on the content ISLAND, not on a hardcoded 1280: the island is what
-    // the camera keeps under the viewport centre at every aspect ratio.
-    let cursorX = ISLAND_CENTRE_X - total / 2;
+
+    if (!isPortrait || units.length <= 5) {
+      const centerY = isPortrait ? PORTRAIT_BANDS.slotsCenterY : BANDS.slotsCenterY;
+      const total =
+        widths.reduce<number>((acc, w) => acc + w, 0) + SLOT_GAP * Math.max(0, units.length - 1);
+      let cursorX = cx - total / 2;
+
+      return units.map((_, index) => {
+        const width = widths[index] ?? 128;
+        const x = cursorX + width / 2;
+        cursorX += width + SLOT_GAP;
+        return { x, y: centerY, width };
+      });
+    }
+
+    // Portrait with > 5 units: wrap into 2 rows
+    const half = Math.ceil(units.length / 2);
+    const row0Widths = widths.slice(0, half);
+    const row1Widths = widths.slice(half);
+
+    const total0 =
+      row0Widths.reduce<number>((acc, w) => acc + w, 0) +
+      SLOT_GAP * Math.max(0, row0Widths.length - 1);
+    const total1 =
+      row1Widths.reduce<number>((acc, w) => acc + w, 0) +
+      SLOT_GAP * Math.max(0, row1Widths.length - 1);
+
+    const row0Y = 630;
+    const row1Y = 770;
+
+    let cursor0 = cx - total0 / 2;
+    let cursor1 = cx - total1 / 2;
+
+    return units.map((_, index) => {
+      const width = widths[index] ?? 128;
+      if (index < half) {
+        const x = cursor0 + width / 2;
+        cursor0 += width + SLOT_GAP;
+        return { x, y: row0Y, width };
+      }
+      const x = cursor1 + width / 2;
+      cursor1 += width + SLOT_GAP;
+      return { x, y: row1Y, width };
+    });
+  }
+
+  private buildSlots(): void {
+    const isPortrait = this.layout.metrics.isPortrait;
+    const cx = this.layout.metrics.centreX;
+    const bands = isPortrait ? PORTRAIT_BANDS : BANDS;
+    const units = targetUnits(this.level);
+    const positions = this.computeSlotPositions(isPortrait, cx);
 
     units.forEach((target, index) => {
-      const width = widths[index] ?? 128;
-      const x = cursorX + width / 2;
-      const y = BANDS.slotsCenterY;
+      const pos = positions[index] ?? { x: cx, y: bands.slotsCenterY, width: 128 };
+      const { x, y, width } = pos;
 
       const bg = this.add.image(x, y, ATLAS_KEY, slotFrameFor(target.unit));
       bg.setDisplaySize(width, TILE_HEIGHT);
       bg.setDepth(5);
 
-      // Ghost letters (T1 only, per the spec's tier table).
       let ghost: Phaser.GameObjects.Text | null = null;
       if (this.level.ghost_letters) {
         ghost = this.add
@@ -496,13 +513,12 @@ export class GameScene extends Phaser.Scene {
         filledBy: null,
       };
       this.slots.push(slot);
-      cursorX += width + SLOT_GAP;
     });
 
-    makeText(
+    this.mechanicText = makeText(
       this,
-      ISLAND_CENTRE_X,
-      BANDS.mechanicY,
+      cx,
+      bands.mechanicY,
       this.mechanicLabel(this.level.mechanic),
       26,
       '#7f95ab',
@@ -511,18 +527,25 @@ export class GameScene extends Phaser.Scene {
 
   // ----------------------------------------------------------------- tray
 
-  private buildTray(): void {
+  /**
+   * Computes tray item positions adaptively:
+   * In landscape: max width 1180, centered around BANDS.trayCenterY.
+   * In portrait: max width 680 (arranging tiles into 2 rows in the thumb zone),
+   *              centered around PORTRAIT_BANDS.trayCenterY (~950–1100).
+   */
+  private computeTrayPositions(isPortrait: boolean, cx: number): { x: number; y: number }[] {
     const items = buildTray(this.level);
-    const isChunk = this.level.mechanic !== 'letter_drag';
+    const maxRowWidth = isPortrait ? PORTRAIT_TRAY_MAX_WIDTH : TRAY_MAX_WIDTH;
+    const trayCenterY = isPortrait ? PORTRAIT_BANDS.trayCenterY : BANDS.trayCenterY;
+    const safeBottom = isPortrait ? PORTRAIT_BANDS.safeBottom : BANDS.safeBottom;
 
-    // Lay the tray out in centred rows so long trays never overflow.
     const rows: TrayItem[][] = [];
     let row: TrayItem[] = [];
     let rowWidth = 0;
     for (const item of items) {
       const w = tileWidth(item.unit);
       const add = row.length === 0 ? w : w + TRAY_GAP;
-      if (rowWidth + add > TRAY_MAX_WIDTH && row.length > 0) {
+      if (rowWidth + add > maxRowWidth && row.length > 0) {
         rows.push(row);
         row = [item];
         rowWidth = w;
@@ -535,70 +558,84 @@ export class GameScene extends Phaser.Scene {
 
     const rowHeight = TILE_HEIGHT + TRAY_ROW_GAP;
     const blockHeight = rows.length * rowHeight - TRAY_ROW_GAP;
-    const startY = BANDS.trayCenterY - blockHeight / 2 + TILE_HEIGHT / 2;
-    // Never let the tray cross the safe bottom (all seed levels fit in 1-2 rows).
+    const startY = trayCenterY - blockHeight / 2 + TILE_HEIGHT / 2;
     const lastRowBottom = startY + (rows.length - 1) * rowHeight + TILE_HEIGHT / 2;
-    const shift = lastRowBottom > BANDS.safeBottom ? lastRowBottom - BANDS.safeBottom : 0;
+    const shift = lastRowBottom > safeBottom ? lastRowBottom - safeBottom : 0;
     const trayTop = startY - shift;
+
+    const positions: { x: number; y: number }[] = [];
 
     rows.forEach((trayRow, rowIndex) => {
       const widths = trayRow.map((item) => tileWidth(item.unit));
       const total =
         widths.reduce<number>((acc, w) => acc + w, 0) + TRAY_GAP * Math.max(0, trayRow.length - 1);
-      let cursorX = ISLAND_CENTRE_X - total / 2;
+      let cursorX = cx - total / 2;
       const y = trayTop + rowIndex * rowHeight;
 
-      trayRow.forEach((item, i) => {
+      trayRow.forEach((_, i) => {
         const width = widths[i] ?? 128;
         const x = cursorX + width / 2;
-        const frame = isChunk ? chunkFrameFor(item.unit) : tileFrameFor(item.unit);
-        const bg = this.add.image(0, 0, ATLAS_KEY, frame);
-        bg.setDisplaySize(width, TILE_HEIGHT);
-        const label = this.add
-          .text(0, -4, item.unit, {
-            fontFamily: FONT_FAMILY,
-            fontSize: '58px',
-            color: isChunk ? '#13351b' : '#3a2a00',
-            fontStyle: 'bold',
-          })
-          .setOrigin(0.5);
-
-        const container = this.add.container(x, y, [bg, label]);
-        container.setSize(width, TILE_HEIGHT);
-        container.setDepth(10);
-        // Hit rect starts at 0,0 — Phaser adds displayOrigin before Contains,
-        // so -w/2 here would shift the touch area left by half a tile.
-        container.setInteractive(
-          new Phaser.Geom.Rectangle(0, 0, width, TILE_HEIGHT),
-          Phaser.Geom.Rectangle.Contains,
-        );
-        // Dragging is delta-based so the grab point is preserved.
-        this.input.setDraggable(container, true);
-
-        const view: TileView = {
-          item,
-          container,
-          width,
-          height: TILE_HEIGHT,
-          label,
-          bg,
-          home: { x, y },
-          placedSlot: null,
-        };
-
-        container.on(Phaser.Input.Events.POINTER_DOWN, () => this.onTileGrab(view));
-        container.on(Phaser.Input.Events.DRAG_START, () => this.onTileGrab(view));
-        // Phaser's DRAG signature is (pointer, dragX, dragY) where dragX/dragY are
-        // the object's new world position (pointer delta applied to its origin).
-        container.on(
-          Phaser.Input.Events.DRAG,
-          (_pointer: Phaser.Input.Pointer, dragX: number, dragY: number) =>
-            this.updateDrag(view, dragX, dragY),
-        );
-
-        this.tiles.push(view);
+        positions.push({ x, y });
         cursorX += width + TRAY_GAP;
       });
+    });
+
+    return positions;
+  }
+
+  private buildTray(): void {
+    const isPortrait = this.layout.metrics.isPortrait;
+    const cx = this.layout.metrics.centreX;
+    const items = buildTray(this.level);
+    const isChunk = this.level.mechanic !== 'letter_drag';
+    const positions = this.computeTrayPositions(isPortrait, cx);
+
+    items.forEach((item, index) => {
+      const pos = positions[index] ?? { x: cx, y: BANDS.trayCenterY };
+      const width = tileWidth(item.unit);
+      const { x, y } = pos;
+
+      const frame = isChunk ? chunkFrameFor(item.unit) : tileFrameFor(item.unit);
+      const bg = this.add.image(0, 0, ATLAS_KEY, frame);
+      bg.setDisplaySize(width, TILE_HEIGHT);
+      const label = this.add
+        .text(0, -4, item.unit, {
+          fontFamily: FONT_FAMILY,
+          fontSize: '58px',
+          color: isChunk ? '#13351b' : '#3a2a00',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5);
+
+      const container = this.add.container(x, y, [bg, label]);
+      container.setSize(width, TILE_HEIGHT);
+      container.setDepth(10);
+      container.setInteractive(
+        new Phaser.Geom.Rectangle(0, 0, width, TILE_HEIGHT),
+        Phaser.Geom.Rectangle.Contains,
+      );
+      this.input.setDraggable(container, true);
+
+      const view: TileView = {
+        item,
+        container,
+        width,
+        height: TILE_HEIGHT,
+        label,
+        bg,
+        home: { x, y },
+        placedSlot: null,
+      };
+
+      container.on(Phaser.Input.Events.POINTER_DOWN, () => this.onTileGrab(view));
+      container.on(Phaser.Input.Events.DRAG_START, () => this.onTileGrab(view));
+      container.on(
+        Phaser.Input.Events.DRAG,
+        (_pointer: Phaser.Input.Pointer, dragX: number, dragY: number) =>
+          this.updateDrag(view, dragX, dragY),
+      );
+
+      this.tiles.push(view);
     });
   }
 
@@ -622,7 +659,6 @@ export class GameScene extends Phaser.Scene {
     if (this.dragging !== tile) return;
     tile.container.setPosition(dragX, dragY);
 
-    // Magnetic hover: highlight the slot under the tile, if it would accept it.
     const over = this.slotUnder(tile);
     if (over !== this.hoverSlot) {
       this.hoverSlot = over;
@@ -639,7 +675,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** The unfilled slot the tile is over and that would accept it. */
   private slotUnder(tile: TileView): SlotView | null {
     const slot = this.slotUnderNearest(tile);
     if (!slot) return null;
@@ -668,11 +703,6 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Nearest unfilled slot inside the shared drop zone (`withinDropZone`), or null.
-   * Hover highlighting and the release decision both call this, so what lights up
-   * green is exactly what accepts the tile.
-   */
   private slotUnderNearest(tile: TileView): SlotView | null {
     let best: SlotView | null = null;
     let bestDist = Number.POSITIVE_INFINITY;
@@ -691,7 +721,6 @@ export class GameScene extends Phaser.Scene {
   private placeTile(tile: TileView, slot: SlotView): void {
     const result = resolveDrop(this.level, tile.item.unit, slot.index, this.filled);
     if (result.snapTo === null) {
-      // Wrong drop: bounce back. No buzzer, no penalty, no life lost.
       this.wrongDrops += 1;
       this.bounceHome(tile);
       return;
@@ -704,12 +733,8 @@ export class GameScene extends Phaser.Scene {
     tile.container.disableInteractive();
     tile.container.setDepth(8);
 
-    // MAGNETIC SNAP, AUDIBLE FIRST: the wooden click lands on the same frame the
-    // tile starts moving, so the lock reads as tactile. It is a separate source
-    // node, so the phoneme below overlaps it instead of cutting it off.
     void this.audio.playSfx('sfx/snap');
 
-    // Magnetic snap: pull the tile into the slot centre with a spring feel.
     this.tweens.add({
       targets: tile.container,
       x: slot.x,
@@ -724,7 +749,6 @@ export class GameScene extends Phaser.Scene {
       },
     });
 
-    // PHONICS RULE: placing a tile speaks the PHONEME, never the letter name.
     const phonemeKey = targetUnits(this.level)[slot.index]?.phoneme ?? '';
     void this.audio.playPhoneme(phonemeKey);
     this.popTile(slot);
@@ -749,11 +773,6 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /**
-   * Wrong placement: tween back to the tray home. No penalty, no buzzer — the
-   * rubbery boing is the whole "not here, try again" message, and it is gentle on
-   * purpose (a harsh error tone is a defect for a 6-year-old).
-   */
   private bounceHome(tile: TileView): void {
     this.tweens.killTweensOf(tile.container);
     void this.audio.playSfx('sfx/bounce');
@@ -766,7 +785,6 @@ export class GameScene extends Phaser.Scene {
       ease: 'Back.Out',
       onComplete: () => {
         tile.container.setDepth(10);
-        // A gentle wobble reads as "not here" without any error sound.
         this.tweens.add({
           targets: tile.container,
           angle: { from: -4, to: 4 },
@@ -781,18 +799,83 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // ---------------------------------------------------------------- responsive repositioning
+
+  private repositionBoard(stage: StageMetrics): void {
+    if (!this.level || this.slots.length === 0) return;
+    const isPortrait = stage.isPortrait;
+    const cx = stage.centreX;
+    const bands = isPortrait ? PORTRAIT_BANDS : BANDS;
+    const inset = isPortrait ? 80 : 92;
+
+    this.layout.setAnchorY(this.backButton, bands.headerCenterY);
+    this.layout.setAnchorY(this.soundButton, bands.headerCenterY);
+
+    if (this.mutedLabel) {
+      this.mutedLabel.x = anchorX(stage, { kind: 'right', inset });
+    }
+
+    if (this.tierLabel) {
+      this.tierLabel.setPosition(cx, bands.headerCenterY - 14);
+    }
+    if (this.levelLabel) {
+      this.levelLabel.setPosition(cx, bands.headerCenterY + 26);
+    }
+
+    if (this.haloGraphics) {
+      this.paintHalo(cx, bands.artCenterY, bands.artHaloRadius);
+    }
+    if (this.artInitial) {
+      this.artInitial.setPosition(cx, bands.artCenterY);
+      this.artInitial.setFontSize(isPortrait ? '130px' : '88px');
+    }
+    if (this.artImage) {
+      this.artImage.setPosition(cx, bands.artCenterY);
+      this.artImage.setDisplaySize(bands.artSize.width, bands.artSize.height);
+    }
+
+    if (this.mechanicText) {
+      this.mechanicText.setPosition(cx, bands.mechanicY);
+    }
+    if (this.hintText) {
+      this.hintText.setPosition(cx, bands.hintY);
+    }
+
+    // Reposition slots
+    const slotPositions = this.computeSlotPositions(isPortrait, cx);
+    this.slots.forEach((slot, index) => {
+      const pos = slotPositions[index];
+      if (!pos) return;
+      slot.x = pos.x;
+      slot.y = pos.y;
+      slot.bg.setPosition(slot.x, slot.y);
+      slot.ghost?.setPosition(slot.x, slot.y - 4);
+      if (slot.filledBy) {
+        slot.filledBy.container.setPosition(slot.x, slot.y);
+      }
+    });
+
+    // Reposition tray tiles
+    const trayPositions = this.computeTrayPositions(isPortrait, cx);
+    this.tiles.forEach((tile, index) => {
+      const pos = trayPositions[index];
+      if (!pos) return;
+      tile.home = pos;
+      if (!tile.placedSlot && this.dragging !== tile) {
+        tile.container.setPosition(tile.home.x, tile.home.y);
+      }
+    });
+  }
+
   // ---------------------------------------------------------------- solved
 
   private onSolved(): void {
     if (this.solved) return;
     this.solved = true;
 
-    // Chime and word together: the chord is the reward, the word is the lesson.
-    // Separate source nodes, so the chime colours the speech instead of clipping it.
     void this.audio.playSfx('sfx/chime');
     this.audio.playWord(this.level.audio_word);
 
-    // Confetti from the atlas dot frame — no extra assets.
     this.time.delayedCall(120, () => this.confetti());
 
     this.time.delayedCall(900, () => {

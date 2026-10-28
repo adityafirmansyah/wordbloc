@@ -8,6 +8,10 @@ import {
   ISLAND_CENTRE_Y,
   MIN_DESIGN_WIDTH,
   MIN_VIEWPORT_SCALE,
+  PORTRAIT_DESIGN_HEIGHT,
+  PORTRAIT_DESIGN_WIDTH,
+  PORTRAIT_ISLAND_CENTRE_X,
+  PORTRAIT_ISLAND_CENTRE_Y,
   anchorX,
   stageMetrics,
   viewportFit,
@@ -102,6 +106,45 @@ describe('stageMetrics — full-bleed stage geometry', () => {
       expect(Number.isFinite(stage.scale)).toBe(true);
       expect(stage.scale).toBe(0);
     }
+  });
+});
+
+describe('stageMetrics — portrait stage geometry', () => {
+  const PORTRAIT_VIEWPORTS = [
+    [393, 851], // Pixel 8 portrait
+    [412, 915], // Modern Android portrait
+    [375, 667], // iPhone SE portrait
+    [414, 896], // iPhone 11 portrait
+    [768, 1024], // iPad portrait
+  ] as const;
+
+  it('fills the viewport exactly at every portrait acceptance aspect ratio', () => {
+    for (const [vw, vh] of PORTRAIT_VIEWPORTS) {
+      const stage = stageMetrics(vw, vh);
+      expect(stage.isPortrait, `${vw}x${vh} isPortrait`).toBe(true);
+      expect(stage.orientation, `${vw}x${vh} orientation`).toBe('portrait');
+      expect(stage.width * stage.scale, `${vw}x${vh} width`).toBeCloseTo(vw, 6);
+      expect(stage.height * stage.scale, `${vw}x${vh} height`).toBeCloseTo(vh, 6);
+    }
+  });
+
+  it('keeps the portrait content island centred at (360, 640)', () => {
+    for (const [vw, vh] of PORTRAIT_VIEWPORTS) {
+      const stage = stageMetrics(vw, vh);
+      expect(stage.centreX).toBe(PORTRAIT_ISLAND_CENTRE_X);
+      expect(stage.centreY).toBe(PORTRAIT_ISLAND_CENTRE_Y);
+      expect(stage.left + stage.width / 2).toBeCloseTo(PORTRAIT_ISLAND_CENTRE_X, 6);
+      expect(stage.top + stage.height / 2).toBeCloseTo(PORTRAIT_ISLAND_CENTRE_Y, 6);
+      expect(stage.width).toBeGreaterThanOrEqual(PORTRAIT_DESIGN_WIDTH);
+      expect(stage.height).toBeGreaterThanOrEqual(PORTRAIT_DESIGN_HEIGHT);
+    }
+  });
+
+  it('derives scale from vw / 720 on typical tall phones', () => {
+    const phone = stageMetrics(393, 851);
+    expect(phone.scale).toBeCloseTo(393 / 720, 6);
+    expect(phone.width).toBeCloseTo(PORTRAIT_DESIGN_WIDTH, 6);
+    expect(phone.height).toBeGreaterThan(PORTRAIT_DESIGN_HEIGHT);
   });
 });
 
@@ -226,13 +269,16 @@ describe('viewport gate under the full-bleed model', () => {
     expect(viewportFit(455, 450).scale).toBeLessThan(MIN_VIEWPORT_SCALE);
   });
 
-  it('still asks a portrait phone to rotate', () => {
+  it('accepts portrait phones as playable without rotating', () => {
     for (const [w, h] of [
       [430, 932],
       [414, 896],
       [375, 667],
+      [393, 851],
+      [412, 915],
     ] as const) {
-      expect(viewportFit(w, h).notice, `${w}x${h}`).toBe('rotate');
+      expect(viewportFit(w, h).notice, `${w}x${h}`).toBe('none');
+      expect(viewportFit(w, h).scale, `${w}x${h}`).toBeGreaterThanOrEqual(MIN_VIEWPORT_SCALE);
     }
   });
 

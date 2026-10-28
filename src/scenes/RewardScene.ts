@@ -8,14 +8,7 @@ import {
 } from '../game/levels';
 import { wordbook } from '../game/wordbook';
 import { AudioManager, type SfxKey } from '../game/audio';
-import {
-  ATLAS_KEY,
-  COLORS,
-  FRAMES,
-  ISLAND_CENTRE_X,
-  SCENES,
-  type StageMetrics,
-} from '../game/theme';
+import { ATLAS_KEY, COLORS, FRAMES, SCENES, type StageMetrics } from '../game/theme';
 import { makeButton, makeText } from '../ui/kit';
 import { StageLayout } from '../ui/stage';
 import type { Level, LevelManifestEntry } from '../game/levelTypes';
@@ -31,6 +24,16 @@ export class RewardScene extends Phaser.Scene {
   private layout!: StageLayout;
   /** Bumped per start so a level load that lands after navigation cannot draw. */
   private loadToken = 0;
+
+  private panel!: Phaser.GameObjects.Image;
+  private starObj: Phaser.GameObjects.Image | null = null;
+  private plusOneText: Phaser.GameObjects.Text | null = null;
+  private niceWorkText: Phaser.GameObjects.Text | null = null;
+  private builtWordText: Phaser.GameObjects.Text | null = null;
+  private countProgressText: Phaser.GameObjects.Text | null = null;
+  private nextBtn: Phaser.GameObjects.Container | Phaser.GameObjects.Text | null = null;
+  private replayBtn: Phaser.GameObjects.Container | null = null;
+  private wordbookBtn: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super(SCENES.reward);
@@ -62,6 +65,47 @@ export class RewardScene extends Phaser.Scene {
     if (upcoming) void preloadLevel(upcoming.id);
 
     void this.loadAndDraw(entry);
+
+    this.layout.onStageChange((stage: StageMetrics) => {
+      this.repositionElements(stage);
+    });
+  }
+
+  private repositionElements(stage: StageMetrics): void {
+    const isPortrait = stage.isPortrait;
+    const cx = stage.centreX;
+
+    if (this.panel) {
+      this.panel.setPosition(cx, isPortrait ? 520 : 300);
+      this.panel.setDisplaySize(isPortrait ? 660 : 800, isPortrait ? 780 : 420);
+    }
+
+    if (this.starObj) {
+      this.starObj.setPosition(cx, isPortrait ? 260 : 186);
+    }
+    if (this.plusOneText) {
+      this.plusOneText.setPosition(cx, isPortrait ? 270 : 196);
+    }
+
+    if (this.niceWorkText) {
+      this.niceWorkText.setPosition(cx, isPortrait ? 390 : 296);
+    }
+    if (this.builtWordText) {
+      this.builtWordText.setPosition(cx, isPortrait ? 460 : 366);
+    }
+    if (this.countProgressText) {
+      this.countProgressText.setPosition(cx, isPortrait ? 520 : 424);
+    }
+
+    if (this.nextBtn) {
+      this.nextBtn.setPosition(cx, isPortrait ? 640 : 528);
+    }
+    if (this.replayBtn) {
+      this.replayBtn.setPosition(isPortrait ? cx - 160 : cx - 250, isPortrait ? 800 : 654);
+    }
+    if (this.wordbookBtn) {
+      this.wordbookBtn.setPosition(isPortrait ? cx + 160 : cx + 250, isPortrait ? 800 : 654);
+    }
   }
 
   /**
@@ -95,19 +139,12 @@ export class RewardScene extends Phaser.Scene {
     this.drawActions();
     this.confetti();
 
-    // Replay the finished word shortly after arrival. The scene was entered from
-    // the solved board, so a gesture has already happened — but the context may
-    // still be suspended on a cold session, so this retries once it is unlocked.
+    // Replay the finished word shortly after arrival.
     const audioKey = level?.audio_word ?? `words/${entry.display}`;
     this.time.delayedCall(300, () => void this.replayWord(audioKey));
   }
 
-  /**
-   * Speaks the finished word, retrying after an unlock if the autoplay policy
-   * swallowed the first attempt (result.outcome 'silent' for a policy block, never
-   * 'file'). A broken file reports 'speech'/'silent' through the manager's own
-   * fallback and is not retried here.
-   */
+  /** Speaks the finished word. */
   private async replayWord(audioKey: string): Promise<void> {
     const first = await this.audio.playWord(audioKey);
     if (first.outcome !== 'silent' || !this.scene.isActive()) return;
@@ -117,13 +154,13 @@ export class RewardScene extends Phaser.Scene {
   }
 
   private drawBackdrop(): void {
-    // Full-bleed gradient + centred content island: the panel keeps its 800x420
-    // content size and stays centred, while the sky around it now reaches every
-    // screen edge.
     this.layout = new StageLayout(this, { backdrop: true });
-    this.add
-      .image(ISLAND_CENTRE_X, 300, ATLAS_KEY, FRAMES.panel)
-      .setDisplaySize(800, 420)
+    const isPortrait = this.layout.metrics.isPortrait;
+    const cx = this.layout.metrics.centreX;
+
+    this.panel = this.add
+      .image(cx, isPortrait ? 520 : 300, ATLAS_KEY, FRAMES.panel)
+      .setDisplaySize(isPortrait ? 660 : 800, isPortrait ? 780 : 420)
       .setDepth(0);
   }
 
@@ -133,22 +170,33 @@ export class RewardScene extends Phaser.Scene {
   };
 
   private drawStar(isNew: boolean): void {
-    const star = this.add.image(ISLAND_CENTRE_X, 186, ATLAS_KEY, FRAMES.star).setScale(0.2);
-    // The ping fires as the star starts growing, not when it lands: the sound has
-    // to lead the animation by a frame or two or the reveal feels disconnected.
+    const isPortrait = this.layout.metrics.isPortrait;
+    const cx = this.layout.metrics.centreX;
+    const starY = isPortrait ? 260 : 186;
+
+    this.starObj = this.add.image(cx, starY, ATLAS_KEY, FRAMES.star).setScale(0.2);
     void this.audio.playSfx('sfx/star');
     this.tweens.add({
-      targets: star,
+      targets: this.starObj,
       scale: 2.1,
       angle: 360,
       duration: 620,
       ease: 'Back.Out',
       onComplete: () => {
-        this.tweens.add({ targets: star, scale: 1.95, duration: 900, yoyo: true, repeat: -1 });
+        if (this.starObj) {
+          this.tweens.add({
+            targets: this.starObj,
+            scale: 1.95,
+            duration: 900,
+            yoyo: true,
+            repeat: -1,
+          });
+        }
       },
     });
-    this.add
-      .text(ISLAND_CENTRE_X, 196, isNew ? '+1' : '', {
+
+    this.plusOneText = this.add
+      .text(cx, isPortrait ? 270 : 196, isNew ? '+1' : '', {
         fontFamily: '"Trebuchet MS", sans-serif',
         fontSize: '46px',
         color: '#ffffff',
@@ -159,14 +207,32 @@ export class RewardScene extends Phaser.Scene {
   }
 
   private drawCopy(display: string): void {
-    makeText(this, ISLAND_CENTRE_X, 296, 'Nice work!', 62, '#21324a', true);
-    makeText(this, ISLAND_CENTRE_X, 366, `You built "${display}"`, 38, '#54708c');
+    const isPortrait = this.layout.metrics.isPortrait;
+    const cx = this.layout.metrics.centreX;
+
+    this.niceWorkText = makeText(
+      this,
+      cx,
+      isPortrait ? 390 : 296,
+      'Nice work!',
+      62,
+      '#21324a',
+      true,
+    );
+    this.builtWordText = makeText(
+      this,
+      cx,
+      isPortrait ? 460 : 366,
+      `You built "${display}"`,
+      38,
+      '#54708c',
+    );
 
     const total = manifestCount();
-    makeText(
+    this.countProgressText = makeText(
       this,
-      ISLAND_CENTRE_X,
-      424,
+      cx,
+      isPortrait ? 520 : 424,
       `${wordbook().count()} of ${total} words in your Wordbook`,
       26,
       '#7f95ab',
@@ -175,38 +241,50 @@ export class RewardScene extends Phaser.Scene {
 
   private drawActions(): void {
     const upcoming = nextLevelManifest(this.levelId);
+    const isPortrait = this.layout.metrics.isPortrait;
+    const cx = this.layout.metrics.centreX;
 
     if (upcoming) {
-      makeButton(this, {
-        x: ISLAND_CENTRE_X,
-        y: 528,
+      this.nextBtn = makeButton(this, {
+        x: cx,
+        y: isPortrait ? 640 : 528,
         label: 'Next',
+        width: 340,
+        height: 128,
         onClick: () => this.scene.start(SCENES.game, { levelId: upcoming.id }),
         variant: 'primary',
         sfx: this.clickSfx,
       });
     } else {
-      makeText(this, ISLAND_CENTRE_X, 528, 'You finished every level!', 32, '#54708c', true);
+      this.nextBtn = makeText(
+        this,
+        cx,
+        isPortrait ? 640 : 528,
+        'You finished every level!',
+        32,
+        '#54708c',
+        true,
+      );
     }
 
-    makeButton(this, {
-      x: ISLAND_CENTRE_X - 250,
-      y: 654,
+    this.replayBtn = makeButton(this, {
+      x: isPortrait ? cx - 160 : cx - 250,
+      y: isPortrait ? 800 : 654,
       label: 'Replay',
-      width: 300,
-      height: 128,
+      width: isPortrait ? 280 : 300,
+      height: isPortrait ? 120 : 128,
       fontSize: 34,
       variant: 'alt',
       sfx: this.clickSfx,
       onClick: () => this.scene.start(SCENES.game, { levelId: this.levelId }),
     });
 
-    makeButton(this, {
-      x: ISLAND_CENTRE_X + 250,
-      y: 654,
+    this.wordbookBtn = makeButton(this, {
+      x: isPortrait ? cx + 160 : cx + 250,
+      y: isPortrait ? 800 : 654,
       label: 'Wordbook',
-      width: 300,
-      height: 128,
+      width: isPortrait ? 280 : 300,
+      height: isPortrait ? 120 : 128,
       fontSize: 34,
       variant: 'alt',
       sfx: this.clickSfx,
