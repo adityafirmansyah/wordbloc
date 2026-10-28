@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { createGameConfig } from './game/config';
 import { assertLevelData } from './game/levels';
-import { gateCurrentViewport } from './ui/viewportGate';
+import { wireViewportGate } from './ui/viewportGate';
 
 /**
  * Boot entry. The level MANIFEST is validated here, so a malformed manifest or a
@@ -18,16 +18,17 @@ function start(): void {
 
   const game = new Phaser.Game(createGameConfig(parent));
 
-  // Touch-target gate: below scale 0.5 no fixed design size can reach 64 CSS px, so
-  // an overlay asks the player to rotate / enlarge instead of serving tiny tiles.
-  // (Under Scale.RESIZE the canvas is already full-bleed; this only decides whether
-  // the playable stage is presented at all.)
-  const syncGate = (): void => {
-    gateCurrentViewport(window);
-  };
-  syncGate();
-  window.addEventListener('resize', syncGate);
-  window.addEventListener('orientationchange', syncGate);
+  // Touch-target gate: under scale 0.36 no fixed design size can reach the 44 CSS px
+  // accessibility floor, so an overlay asks the player to rotate / enlarge instead of
+  // serving un-tappable tiles. (Under Scale.RESIZE the canvas is already full-bleed;
+  // this only decides whether the playable stage is presented at all.)
+  //
+  // The floor is 0.36 (vh >= 260 CSS px) rather than 0.5 precisely because a real
+  // phone in landscape exposes only ~265-299 CSS px once Chrome/Safari has taken its
+  // ~94 CSS px of browser chrome — the old floor gated every physical phone.
+  // `wireViewportGate` gates at boot, re-gates on resize / orientationchange /
+  // fullscreenchange, and owns the notice's "Go fullscreen" button.
+  wireViewportGate(window);
 
   // Expose for e2e/QA probing only; not used by gameplay.
   (window as Window & { __WORDblocGame?: Phaser.Game }).__WORDblocGame = game;

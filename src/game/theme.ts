@@ -36,18 +36,28 @@
  * renders at exactly `scale` CSS px per design px, so the touch-target math below
  * stays exact and one number describes both regimes.
  *
- * TOUCH-TARGET MATH (spec: "Touch targets >= 64x64 CSS px")
+ * TOUCH-TARGET MATH (spec: "Touch targets >= 64x64 CSS px at 0.5, >= 44x44 at the
+ * hard floor"; 44x44 is WCAG 2.5.5 / Android Material's 48dp sits at 0.5)
  * In both regimes `scale === min(vw / DESIGN_WIDTH, vh / DESIGN_HEIGHT)`. Every
- * interactive element is sized so `size * scale >= 64` at the smallest supported
- * viewport (640x360 CSS, i.e. a phone in landscape, scale = 0.5):
- *   - tiles      128 x 144 design -> 64 x 72 CSS at scale 0.5
- *   - buttons    128 tall design  -> 64 CSS tall at scale 0.5
+ * interactive element is sized so `size * scale >= MIN_TOUCH_CSS` (44) at the
+ * smallest SUPPORTED viewport, i.e. at MIN_VIEWPORT_SCALE = 0.36:
+ *   - tiles      128 x 144 design -> 46.1 x 51.8 CSS at scale 0.36
+ *   - buttons    128 tall design  -> 46.1 CSS tall at scale 0.36
+ *   - chunk tile 162 wide design  -> 58.3 CSS wide at scale 0.36
  *
- * Below that scale the 64px floor cannot be met for ANY fixed design size, so the
- * app refuses to present the playable stage: `viewportFit()` reports 'rotate'
- * (portrait phone) or 'too-small' (tiny landscape window) and the HTML overlay in
- * index.html replaces the canvas with a readable instruction. That keeps the
- * constraint true across the whole viewport domain instead of only in landscape.
+ * WHY THE FLOOR IS 0.36 AND NOT 0.5 (owner defect, real Android phone):
+ * the old 0.5 floor demanded `innerHeight >= 360` CSS px, but Chrome on Android
+ * spends ~94 CSS px on chrome (status bar ~24 + URL omnibox ~56 + gesture bar
+ * ~14). A 393-CSS-px-tall phone in landscape therefore exposes only ~299 CSS px
+ * (265-275 on smaller 360-px-wide phones) and EVERY real phone with the address
+ * bar visible was gated. 0.36 is the floor a real phone can clear — vh >= 260 CSS
+ * px — and it still leaves every control above the 44 CSS px accessibility floor.
+ *
+ * Below that scale no fixed design size can meet 44 CSS px, so the app refuses to
+ * present the playable stage: `viewportFit()` reports 'rotate' (portrait) or
+ * 'too-small' (tiny landscape window) and the HTML overlay in index.html replaces
+ * the canvas with a readable instruction. That keeps the constraint true across
+ * the whole viewport domain instead of only in landscape.
  *
  * RENDER RESOLUTION (measured trade-off, recorded so it is not rediscovered)
  * Scale.RESIZE gives one canvas backing pixel per CSS pixel: Phaser sizes the
@@ -110,8 +120,19 @@ export function artHaloColor(category: string): number {
  */
 export const MIN_DESIGN_WIDTH = DESIGN_WIDTH;
 
-/** Worst-case stage scale we design touch targets for (640x360 CSS). */
-export const MIN_VIEWPORT_SCALE = 0.5;
+/**
+ * Hard floor on the stage scale. 0.36 === `vh >= 260 CSS px` on a wide (phone)
+ * stage, which is what a real phone in landscape exposes once Chrome/Safari has
+ * taken its ~94 CSS px of browser chrome. See the TOUCH-TARGET MATH note above.
+ */
+export const MIN_VIEWPORT_SCALE = 0.36;
+
+/**
+ * Smallest touch target accepted at MIN_VIEWPORT_SCALE, CSS px. WCAG 2.5.5 (AA)
+ * and Android Material both ask for 44; the spec's 64x64 is met at scale >= 0.5,
+ * which a desktop window still gets.
+ */
+export const MIN_TOUCH_CSS = 44;
 
 /** Viewport gate verdict: playable, rotate the device, or enlarge the window. */
 export type ViewportNotice = 'none' | 'rotate' | 'too-small';
@@ -191,9 +212,15 @@ export function stageMetrics(viewportWidth: number, viewportHeight: number): Sta
 }
 
 /**
- * Decides whether the stage can honour the 64 CSS px touch-target floor.
+ * Decides whether the stage can honour the 44 CSS px touch-target floor.
  * Below MIN_VIEWPORT_SCALE no design size can, so we ask the player to rotate
  * (portrait) or enlarge the window (landscape) instead of serving 36px buttons.
+ *
+ * Playability is checked FIRST, before orientation: a portrait tablet (768x1024,
+ * scale 0.6) reaches the floor and is genuinely fine to play, so it must never be
+ * told to rotate. Orientation only picks WHICH hint a blocked viewport shows:
+ * portrait -> 'rotate' (the device has a sideways mode that fixes it), landscape
+ * -> 'too-small' (only a bigger window helps).
  */
 export function viewportFit(width: number, height: number): ViewportFit {
   const scale = stageMetrics(width, height).scale;
@@ -250,7 +277,10 @@ export const FONT_FAMILY = '"Trebuchet MS", "Segoe UI", Verdana, sans-serif';
 
 /** Interactive tile height (design px). See touch-target math above. */
 export const TILE_HEIGHT = 144;
-/** Minimum tile width; keeps 1-letter tiles above the 64 CSS px floor at s=0.5. */
+/**
+ * Minimum tile width: 64 CSS px at s=0.5, still 46 CSS px (>= 44 WCAG) at the
+ * hard floor s=0.36.
+ */
 export const TILE_WIDTH_MIN = 128;
 const TILE_WIDTH_PAD = 60;
 const TILE_WIDTH_PER_CHAR = 34;
@@ -362,7 +392,10 @@ export const FRAMES = {
   btnSqDown: 'btn_sq_down',
 } as const;
 
-/** Button frame sizes (design px). Height 128 keeps the 64 CSS px floor at s=0.5. */
+/**
+ * Button frame sizes (design px). Height 128 is 64 CSS px at s=0.5 and 46 CSS px
+ * (>= 44 WCAG) at the hard floor s=0.36.
+ */
 export const BUTTON_SIZE = { width: 340, height: 128 } as const;
 export const HEADER_BUTTON_SIZE = { width: 128, height: 128 } as const;
 

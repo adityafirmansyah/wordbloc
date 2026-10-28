@@ -93,7 +93,7 @@ export interface IconButtonOptions {
   sfx?: SfxPlayer;
 }
 
-/** Square icon button (>=128x128 design px => 64x64 CSS at scale 0.5). */
+/** Square icon button (>=128x128 design px => 64x64 CSS at scale 0.5, 46 at 0.36). */
 export function makeIconButton(
   scene: Phaser.Scene,
   opts: IconButtonOptions,

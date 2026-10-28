@@ -5,6 +5,7 @@ import {
   DESIGN_WIDTH,
   HEADER_BUTTON_SIZE,
   ISLAND_CENTRE_X,
+  MIN_TOUCH_CSS,
   MIN_VIEWPORT_SCALE,
   TILE_HEIGHT,
   anchorX,
@@ -15,24 +16,49 @@ import {
 /**
  * Regression guards for layout/touch-target defects found during browser QA.
  * These encode the measured failures so they cannot silently return.
+ *
+ * Touch targets are checked at TWO scales:
+ *   - 0.5 (the spec's design scale, a 640x360+ window): must clear 64 CSS px;
+ *   - MIN_VIEWPORT_SCALE 0.36 (a real phone in landscape once browser chrome is
+ *     subtracted, vh >= 260 CSS px): must still clear the 44 CSS px WCAG floor.
+ * Anything below 0.36 is gated off by `viewportFit()`, so 44 is the true worst case.
  */
 
-const MIN_CSS = 64;
-const css = (designPx: number): number => designPx * MIN_VIEWPORT_SCALE;
+const SPEC_CSS = 64;
+const specCss = (designPx: number): number => designPx * 0.5;
+const floorCss = (designPx: number): number => designPx * MIN_VIEWPORT_SCALE;
 
 describe('touch targets — regression: header buttons were 54 CSS px', () => {
-  it('header icon buttons clear the 64 CSS px floor', () => {
+  it('header icon buttons clear the 64 CSS px spec floor at scale 0.5', () => {
     // Measured at 640x360 (s=0.5): a 108 design px button rendered at 54 CSS px.
-    expect(css(HEADER_BUTTON_SIZE.width)).toBeGreaterThanOrEqual(MIN_CSS);
-    expect(css(HEADER_BUTTON_SIZE.height)).toBeGreaterThanOrEqual(MIN_CSS);
+    expect(specCss(HEADER_BUTTON_SIZE.width)).toBeGreaterThanOrEqual(SPEC_CSS);
+    expect(specCss(HEADER_BUTTON_SIZE.height)).toBeGreaterThanOrEqual(SPEC_CSS);
   });
 
   it('108 design px would have failed — the constant must stay above it', () => {
-    expect(css(108)).toBeLessThan(MIN_CSS);
+    expect(specCss(108)).toBeLessThan(SPEC_CSS);
   });
 
-  it('primary buttons clear the floor', () => {
-    expect(css(BUTTON_SIZE.height)).toBeGreaterThanOrEqual(MIN_CSS);
+  it('primary buttons clear the spec floor', () => {
+    expect(specCss(BUTTON_SIZE.height)).toBeGreaterThanOrEqual(SPEC_CSS);
+  });
+
+  it('every control still clears the 44 CSS px accessibility floor at 0.36', () => {
+    expect(floorCss(HEADER_BUTTON_SIZE.width)).toBeGreaterThanOrEqual(MIN_TOUCH_CSS);
+    expect(floorCss(HEADER_BUTTON_SIZE.height)).toBeGreaterThanOrEqual(MIN_TOUCH_CSS);
+    expect(floorCss(BUTTON_SIZE.height)).toBeGreaterThanOrEqual(MIN_TOUCH_CSS);
+    expect(floorCss(BUTTON_SIZE.width)).toBeGreaterThanOrEqual(MIN_TOUCH_CSS);
+    expect(floorCss(TILE_HEIGHT)).toBeGreaterThanOrEqual(MIN_TOUCH_CSS);
+    expect(floorCss(tileWidth('X'))).toBeGreaterThanOrEqual(MIN_TOUCH_CSS);
+  });
+
+  it('a real phone landscape viewport gets both a playable stage and ≥44 CSS px tiles', () => {
+    // 851x299 is the owner's phone (2340x1080 @ DPR 2.75) with Chrome's toolbar.
+    const { scale } = stageMetrics(851, 299);
+    expect(scale).toBeGreaterThanOrEqual(MIN_VIEWPORT_SCALE);
+    expect(HEADER_BUTTON_SIZE.width * scale).toBeGreaterThanOrEqual(MIN_TOUCH_CSS);
+    expect(TILE_HEIGHT * scale).toBeGreaterThanOrEqual(MIN_TOUCH_CSS);
+    expect(tileWidth('X') * scale).toBeGreaterThanOrEqual(MIN_TOUCH_CSS);
   });
 });
 

@@ -250,7 +250,8 @@ export class WordbookScene extends Phaser.Scene {
 
     const card = this.add.container(x, y, [bg, well, thumb.image, word, meta, speakerBg, speaker]);
     card.setSize(width, height);
-    // Whole card is a >=292x128 design px target (>=146x64 CSS at scale 0.5).
+    // Whole card is a >=292x128 design px target (>=146x64 CSS at scale 0.5,
+    // >=105x46 at the 0.36 hard floor).
     // Rect starts at 0,0: Phaser adds displayOrigin before the Contains test.
     card.setInteractive(
       new Phaser.Geom.Rectangle(0, 0, width, height),

@@ -187,23 +187,43 @@ describe('viewport gate under the full-bleed model', () => {
     }
   });
 
-  it('the landscape floor is a HEIGHT floor (vh >= 360) for wide aspects', () => {
-    // 932x360: exactly the floor (scale 0.5) -> playable.
-    expect(viewportFit(932, 360).scale).toBeCloseTo(MIN_VIEWPORT_SCALE, 6);
-    expect(viewportFit(932, 360).notice).toBe('none');
-    // One CSS px shorter -> no fixed design size can reach 64 CSS px.
-    expect(viewportFit(932, 359).notice).toBe('too-small');
-    expect(viewportFit(932, 359).scale).toBeLessThan(MIN_VIEWPORT_SCALE);
+  it('is playable on real phones in landscape once browser chrome is subtracted', () => {
+    // The owner defect: 0.5 required >= 360 CSS px of height, which no phone with a
+    // visible URL bar has. These are the measured innerHeight values.
+    for (const [vw, vh] of [
+      [851, 299],
+      [800, 275],
+      [932, 320],
+      [780, 265],
+    ] as const) {
+      const fit = viewportFit(vw, vh);
+      expect(fit.notice, `${vw}x${vh}`).toBe('none');
+      expect(fit.scale, `${vw}x${vh}`).toBeGreaterThanOrEqual(MIN_VIEWPORT_SCALE);
+    }
   });
 
-  it('the narrow floor is a WIDTH floor (vw >= 640) for landscape aspects', () => {
+  it('the landscape floor is a HEIGHT floor (vh >= 259.2) for wide aspects', () => {
+    const floorHeight = MIN_VIEWPORT_SCALE * DESIGN_HEIGHT; // 259.2 CSS px
+    expect(floorHeight).toBeCloseTo(259.2, 6);
+    // At the floor (scale 0.36) -> playable.
+    expect(viewportFit(932, floorHeight).scale).toBeCloseTo(MIN_VIEWPORT_SCALE, 9);
+    expect(viewportFit(932, floorHeight).notice).toBe('none');
+    // One CSS px shorter -> no fixed design size can reach the 44 CSS px floor.
+    expect(viewportFit(932, floorHeight - 1).notice).toBe('too-small');
+    expect(viewportFit(932, floorHeight - 1).scale).toBeLessThan(MIN_VIEWPORT_SCALE);
+    // The documented round number: 260 CSS px is in, 258 is out.
+    expect(viewportFit(932, 260).notice).toBe('none');
+    expect(viewportFit(932, 258).notice).toBe('too-small');
+  });
+
+  it('the narrow floor is a WIDTH floor (vw >= 460.8) for landscape aspects', () => {
     // 700x600 is landscape but narrower than 16:9, so the stage width is pinned
     // at MIN_DESIGN_WIDTH and the scale is vw / 1280.
     expect(stageMetrics(700, 600).scale).toBeCloseTo(700 / DESIGN_WIDTH, 6);
-    expect(viewportFit(640, 560).scale).toBeCloseTo(MIN_VIEWPORT_SCALE, 6);
-    expect(viewportFit(640, 560).notice).toBe('none');
-    expect(viewportFit(620, 540).notice).toBe('too-small');
-    expect(viewportFit(620, 540).scale).toBeLessThan(MIN_VIEWPORT_SCALE);
+    expect(viewportFit(461, 460).scale).toBeGreaterThanOrEqual(MIN_VIEWPORT_SCALE);
+    expect(viewportFit(461, 460).notice).toBe('none');
+    expect(viewportFit(455, 450).notice).toBe('too-small');
+    expect(viewportFit(455, 450).scale).toBeLessThan(MIN_VIEWPORT_SCALE);
   });
 
   it('still asks a portrait phone to rotate', () => {
