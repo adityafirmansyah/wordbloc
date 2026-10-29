@@ -6,9 +6,8 @@ import {
   CARD_SIZE,
   COLORS,
   DESIGN_HEIGHT,
-  FRAME_BUCKETS,
   PANEL_SIZE,
-  bucketDesignWidth,
+  TILE_WIDTH_MIN,
   type TileColors,
 } from './theme';
 
@@ -73,10 +72,10 @@ export function makeTileFrameSpec(
   width: number,
   height: number,
   c: TileColors,
-  bucket: number,
+  bucket?: number,
 ): FrameSpec {
   return {
-    name: `${name}_w${bucket}`,
+    name: bucket !== undefined ? `${name}_w${bucket}` : name,
     width,
     height,
     draw: (g, w, h) => {
@@ -110,10 +109,10 @@ export function makeSlotFrameSpec(
   width: number,
   height: number,
   done: boolean,
-  bucket: number,
+  bucket?: number,
 ): FrameSpec {
   return {
-    name: `${name}_w${bucket}`,
+    name: bucket !== undefined ? `${name}_w${bucket}` : name,
     width,
     height,
     draw: (g, w, h) => {
@@ -370,13 +369,12 @@ export function buildFrameSpecs(): FrameSpec[] {
     shine: COLORS.chunkShine,
   };
 
-  for (const bucket of FRAME_BUCKETS) {
-    const w = bucketDesignWidth(bucket);
-    specs.push(makeTileFrameSpec('tile', w, TILE_H, letterColors, bucket));
-    specs.push(makeTileFrameSpec('chunk', w, TILE_H, chunkColors, bucket));
-    specs.push(makeSlotFrameSpec('slot', w, TILE_H, false, bucket));
-    specs.push(makeSlotFrameSpec('slot_done', w, TILE_H, true, bucket));
-  }
+  // 4 clean base frames for NineSlice rendering (each 128x144, 30px corner slices).
+  // Eliminates the fixed 6-character bucket limit forever while shrinking the texture atlas.
+  specs.push(makeTileFrameSpec('tile', TILE_WIDTH_MIN, TILE_H, letterColors));
+  specs.push(makeTileFrameSpec('chunk', TILE_WIDTH_MIN, TILE_H, chunkColors));
+  specs.push(makeSlotFrameSpec('slot', TILE_WIDTH_MIN, TILE_H, false));
+  specs.push(makeSlotFrameSpec('slot_done', TILE_WIDTH_MIN, TILE_H, true));
 
   specs.push(
     makeButtonFrameSpec(
@@ -502,7 +500,7 @@ export function packFrames(specs: FrameSpec[], maxWidth: number, padding: number
  */
 export function buildUiAtlas(scene: Phaser.Scene, maxWidth = 2048): Phaser.Textures.Texture {
   const existing = scene.textures.exists(ATLAS_KEY) ? scene.textures.get(ATLAS_KEY) : null;
-  if (existing && existing.key === ATLAS_KEY && existing.has('tile_w1')) {
+  if (existing && existing.key === ATLAS_KEY && (existing.has('tile') || existing.has('tile_w1'))) {
     return existing;
   }
 
@@ -529,6 +527,17 @@ export function buildUiAtlas(scene: Phaser.Scene, maxWidth = 2048): Phaser.Textu
     if (!at) continue;
     if (!texture.has(spec.name)) {
       texture.add(spec.name, 0, at.x, at.y, spec.width, spec.height);
+    }
+  }
+
+  // Register backwards-compatible frame aliases for legacy bucket names
+  for (let bucket = 1; bucket <= 6; bucket += 1) {
+    for (const base of ['tile', 'chunk', 'slot', 'slot_done'] as const) {
+      const alias = `${base}_w${bucket}`;
+      const at = packed.placements.get(base);
+      if (at && !texture.has(alias)) {
+        texture.add(alias, 0, at.x, at.y, at.width, at.height);
+      }
     }
   }
 

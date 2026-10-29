@@ -12,10 +12,16 @@ import {
   PORTRAIT_DESIGN_WIDTH,
   PORTRAIT_ISLAND_CENTRE_X,
   PORTRAIT_ISLAND_CENTRE_Y,
+  TILE_CORNER_SLICE,
   TILE_HEIGHT,
+  TILE_WIDTH_MIN,
   bucketDesignWidth,
   chunkFrameFor,
   frameBucketFor,
+  legacyChunkFrameFor,
+  legacySlotDoneFrameFor,
+  legacySlotFrameFor,
+  legacyTileFrameFor,
   slotDoneFrameFor,
   slotFrameFor,
   stageMetrics,
@@ -127,6 +133,41 @@ describe('tile sizing', () => {
 
   it('1-char tiles keep a square-ish minimum', () => {
     expect(tileWidth('A')).toBe(tileWidth('Z'));
+    expect(tileWidth('A')).toBe(TILE_WIDTH_MIN);
+  });
+
+  it('smoothly scales for multi-word phrases (Levels 31+) without capping at 6 chars', () => {
+    const phrase6 = tileWidth('SWITCH');
+    const phrase9 = tileWidth('SWITCH ON');
+    const phrase10 = tileWidth('A SLICE OF');
+    const phrase16 = tileWidth('BRUSH YOUR TEETH');
+    const phrase20 = tileWidth('AN APPLE A DAY KEEPS');
+
+    expect(phrase9).toBeGreaterThan(phrase6);
+    expect(phrase10).toBeGreaterThan(phrase9);
+    expect(phrase16).toBeGreaterThan(phrase10);
+    expect(phrase20).toBeGreaterThan(phrase16);
+
+    // Exact formula check: 60 + chars * 34
+    expect(phrase9).toBe(60 + 9 * 34); // 366
+    expect(phrase10).toBe(60 + 10 * 34); // 400
+    expect(phrase16).toBe(60 + 16 * 34); // 604
+    expect(phrase20).toBe(60 + 20 * 34); // 740
+  });
+
+  it('guarantees monotonic non-decreasing widths for phrase growth', () => {
+    let prev = tileWidth('A');
+    for (let len = 2; len <= 30; len += 1) {
+      const w = tileWidth('X'.repeat(len));
+      expect(w).toBeGreaterThanOrEqual(prev);
+      prev = w;
+    }
+  });
+
+  it('NineSlice corner slices fit comfortably within minimum dimensions', () => {
+    expect(TILE_CORNER_SLICE * 2).toBeLessThanOrEqual(TILE_WIDTH_MIN);
+    expect(TILE_CORNER_SLICE * 2).toBeLessThanOrEqual(TILE_HEIGHT);
+    expect(TILE_CORNER_SLICE).toBe(30);
   });
 });
 
@@ -144,16 +185,26 @@ describe('atlas frame bucketing', () => {
     }
   });
 
-  it('produces distinct frame names per family', () => {
-    expect(tileFrameFor('a')).toBe('tile_w1');
-    expect(chunkFrameFor('BUT')).toBe('chunk_w3');
-    expect(slotFrameFor('BUT')).toBe('slot_w3');
-    expect(slotDoneFrameFor('BUT')).toBe('slot_done_w3');
+  it('produces distinct unified frame names per family', () => {
+    expect(tileFrameFor('a')).toBe('tile');
+    expect(chunkFrameFor('BUT')).toBe('chunk');
+    expect(slotFrameFor('BUT')).toBe('slot');
+    expect(slotDoneFrameFor('BUT')).toBe('slot_done');
   });
 
-  it('long chunks share the width-6 frame', () => {
-    expect(chunkFrameFor('FLOWER')).toBe('chunk_w6');
-    expect(chunkFrameFor('BUTTERFLY')).toBe('chunk_w6');
+  it('long chunks and multi-word phrases share the unified frame without 6-character caps', () => {
+    expect(chunkFrameFor('FLOWER')).toBe('chunk');
+    expect(chunkFrameFor('BUTTERFLY')).toBe('chunk');
+    expect(chunkFrameFor('A SLICE OF')).toBe('chunk');
+  });
+
+  it('preserves legacy bucketed aliases for backwards compatibility', () => {
+    expect(legacyTileFrameFor('a')).toBe('tile_w1');
+    expect(legacyChunkFrameFor('BUT')).toBe('chunk_w3');
+    expect(legacySlotFrameFor('BUT')).toBe('slot_w3');
+    expect(legacySlotDoneFrameFor('BUT')).toBe('slot_done_w3');
+    expect(legacyChunkFrameFor('FLOWER')).toBe('chunk_w6');
+    expect(legacyChunkFrameFor('BUTTERFLY')).toBe('chunk_w6');
   });
 });
 

@@ -60,3 +60,28 @@ describe('drop zone (shared by hover highlight and drop decision)', () => {
     expect(withinDropZone({ x: slot.x, y: slot.y + dy }, slot)).toBe(true);
   });
 });
+
+describe('drop zone for phrase levels (Levels 31+)', () => {
+  const phrases = [
+    'A SLICE OF',
+    'YOUR TEETH',
+    'SWITCH ON',
+    'BRUSH YOUR TEETH',
+    'AN APPLE A DAY KEEPS',
+  ];
+
+  it.each(phrases)('accepts drop inside slop and rejects outside for "%s"', (phrase) => {
+    const width = tileWidth(phrase);
+    const phraseSlot = { x: 600, y: 400, width, height: TILE_HEIGHT };
+
+    expect(withinDropZone({ x: phraseSlot.x, y: phraseSlot.y }, phraseSlot)).toBe(true);
+
+    const edgeX = phraseSlot.x + phraseSlot.width / 2 + DROP_SLOP_X;
+    expect(withinDropZone({ x: edgeX, y: phraseSlot.y }, phraseSlot)).toBe(true);
+    expect(withinDropZone({ x: edgeX + 1, y: phraseSlot.y }, phraseSlot)).toBe(false);
+
+    const edgeY = phraseSlot.y + phraseSlot.height / 2 + DROP_SLOP_Y;
+    expect(withinDropZone({ x: phraseSlot.x, y: edgeY }, phraseSlot)).toBe(true);
+    expect(withinDropZone({ x: phraseSlot.x, y: edgeY + 1 }, phraseSlot)).toBe(false);
+  });
+});

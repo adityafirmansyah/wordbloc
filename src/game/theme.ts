@@ -321,6 +321,12 @@ export const TILE_WIDTH_MIN = 128;
 const TILE_WIDTH_PAD = 60;
 const TILE_WIDTH_PER_CHAR = 34;
 
+/**
+ * Corner slice size for NineSlice tiles and slots (design px).
+ * 30px preserves crisp, undistorted rounded corners (r=28) regardless of unit length.
+ */
+export const TILE_CORNER_SLICE = 30;
+
 /** Gaps between slots / tiles, in design px. */
 export const SLOT_GAP = 8;
 export const TRAY_GAP = 10;
@@ -369,9 +375,8 @@ export function tileWidth(unit: string): number {
 }
 
 /**
- * Atlas frames are bucketed by unit length, capped at 6 characters. Frame k is
- * generated at `tileWidth('X'.repeat(k))`, so it is always at least as wide as
- * the widest tile in that bucket and sprites only ever scale down (never up).
+ * Legacy frame bucket helper (retained for backwards compatibility).
+ * Under NineSlice rendering, base frames scale to any unit length without capping at 6 chars.
  */
 export const MAX_FRAME_BUCKET = 6;
 
@@ -379,23 +384,41 @@ export function frameBucketFor(unit: string): number {
   return Math.min(Math.max(unit.length, 1), MAX_FRAME_BUCKET);
 }
 
-/** Every bucket 1..MAX_FRAME_BUCKET, used by the atlas builder. */
+/** Every bucket 1..MAX_FRAME_BUCKET, used by legacy callers / atlas tests. */
 export const FRAME_BUCKETS: readonly number[] = [1, 2, 3, 4, 5, 6];
 
 export function bucketDesignWidth(bucket: number): number {
   return tileWidth('X'.repeat(bucket));
 }
 
-export function tileFrameFor(unit: string): string {
+/**
+ * Unified frame selectors for NineSlice tiles & slots.
+ * Unified frames 'tile', 'chunk', 'slot', 'slot_done' are used across all unit lengths.
+ */
+export function tileFrameFor(_unit?: string): string {
+  return 'tile';
+}
+export function chunkFrameFor(_unit?: string): string {
+  return 'chunk';
+}
+export function slotFrameFor(_unit?: string): string {
+  return 'slot';
+}
+export function slotDoneFrameFor(_unit?: string): string {
+  return 'slot_done';
+}
+
+/** Legacy bucketed frame selectors (backwards-compatible aliases). */
+export function legacyTileFrameFor(unit: string): string {
   return `tile_w${frameBucketFor(unit)}`;
 }
-export function chunkFrameFor(unit: string): string {
+export function legacyChunkFrameFor(unit: string): string {
   return `chunk_w${frameBucketFor(unit)}`;
 }
-export function slotFrameFor(unit: string): string {
+export function legacySlotFrameFor(unit: string): string {
   return `slot_w${frameBucketFor(unit)}`;
 }
-export function slotDoneFrameFor(unit: string): string {
+export function legacySlotDoneFrameFor(unit: string): string {
   return `slot_done_w${frameBucketFor(unit)}`;
 }
 
@@ -408,8 +431,12 @@ export interface TileColors {
   shine: number;
 }
 
-/** Non-tile frame names produced by buildUiAtlas(). */
+/** Frame names produced by buildUiAtlas(). */
 export const FRAMES = {
+  tile: 'tile',
+  chunk: 'chunk',
+  slot: 'slot',
+  slotDone: 'slot_done',
   bgStrip: 'bg_strip',
   panel: 'panel',
   card: 'card',

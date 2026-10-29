@@ -26,6 +26,7 @@ import {
   PORTRAIT_TRAY_MAX_WIDTH,
   SCENES,
   SLOT_GAP,
+  TILE_CORNER_SLICE,
   TILE_HEIGHT,
   TRAY_GAP,
   TRAY_MAX_WIDTH,
@@ -56,7 +57,7 @@ interface SlotView {
   y: number;
   width: number;
   height: number;
-  bg: Phaser.GameObjects.Image;
+  bg: Phaser.GameObjects.NineSlice;
   ghost: Phaser.GameObjects.Text | null;
   filledBy: TileView | null;
 }
@@ -67,7 +68,7 @@ interface TileView {
   width: number;
   height: number;
   label: Phaser.GameObjects.Text;
-  bg: Phaser.GameObjects.Image;
+  bg: Phaser.GameObjects.NineSlice;
   home: { x: number; y: number };
   placedSlot: SlotView | null;
 }
@@ -484,8 +485,18 @@ export class GameScene extends Phaser.Scene {
       const pos = positions[index] ?? { x: cx, y: bands.slotsCenterY, width: 128 };
       const { x, y, width } = pos;
 
-      const bg = this.add.image(x, y, ATLAS_KEY, slotFrameFor(target.unit));
-      bg.setDisplaySize(width, TILE_HEIGHT);
+      const bg = this.add.nineslice(
+        x,
+        y,
+        ATLAS_KEY,
+        slotFrameFor(target.unit),
+        width,
+        TILE_HEIGHT,
+        TILE_CORNER_SLICE,
+        TILE_CORNER_SLICE,
+        TILE_CORNER_SLICE,
+        TILE_CORNER_SLICE,
+      );
       bg.setDepth(5);
 
       let ghost: Phaser.GameObjects.Text | null = null;
@@ -596,8 +607,18 @@ export class GameScene extends Phaser.Scene {
       const { x, y } = pos;
 
       const frame = isChunk ? chunkFrameFor(item.unit) : tileFrameFor(item.unit);
-      const bg = this.add.image(0, 0, ATLAS_KEY, frame);
-      bg.setDisplaySize(width, TILE_HEIGHT);
+      const bg = this.add.nineslice(
+        0,
+        0,
+        ATLAS_KEY,
+        frame,
+        width,
+        TILE_HEIGHT,
+        TILE_CORNER_SLICE,
+        TILE_CORNER_SLICE,
+        TILE_CORNER_SLICE,
+        TILE_CORNER_SLICE,
+      );
       const label = this.add
         .text(0, -4, item.unit, {
           fontFamily: FONT_FAMILY,
@@ -665,10 +686,12 @@ export class GameScene extends Phaser.Scene {
       this.slots.forEach((slot) => {
         slot.bg.setScale(1);
         slot.bg.setFrame(slot.filledBy ? slotDoneFrameFor(slot.unit) : slotFrameFor(slot.unit));
+        slot.bg.setSize(slot.width, slot.height);
         slot.bg.setDisplaySize(slot.width, slot.height);
       });
       if (over) {
         over.bg.setFrame(slotDoneFrameFor(over.unit));
+        over.bg.setSize(over.width, over.height);
         over.bg.setDisplaySize(over.width, over.height);
         over.bg.setScale(1.06);
       }
@@ -691,6 +714,7 @@ export class GameScene extends Phaser.Scene {
     this.slots.forEach((slot) => {
       slot.bg.setScale(1);
       slot.bg.setFrame(slot.filledBy ? slotDoneFrameFor(slot.unit) : slotFrameFor(slot.unit));
+      slot.bg.setSize(slot.width, slot.height);
       slot.bg.setDisplaySize(slot.width, slot.height);
     });
     this.hoverSlot = null;
@@ -744,6 +768,7 @@ export class GameScene extends Phaser.Scene {
       ease: 'Back.Out',
       onComplete: () => {
         slot.bg.setFrame(slotDoneFrameFor(slot.unit));
+        slot.bg.setSize(slot.width, slot.height);
         slot.bg.setDisplaySize(slot.width, slot.height);
         slot.ghost?.setVisible(false);
       },
@@ -768,6 +793,7 @@ export class GameScene extends Phaser.Scene {
       ease: 'Quad.Out',
       onComplete: () => {
         slot.bg.setScale(1);
+        slot.bg.setSize(slot.width, slot.height);
         slot.bg.setDisplaySize(slot.width, slot.height);
       },
     });
