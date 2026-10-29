@@ -320,6 +320,8 @@ export const TILE_HEIGHT = 144;
 export const TILE_WIDTH_MIN = 128;
 const TILE_WIDTH_PAD = 60;
 const TILE_WIDTH_PER_CHAR = 34;
+const PHRASE_WIDTH_BASE = 196;
+const PHRASE_WIDTH_PER_CHAR = 10;
 
 /**
  * Corner slice size for NineSlice tiles and slots (design px).
@@ -371,7 +373,25 @@ export const SCENES = {
 /** Width of a tile/slot holding `unit`. */
 export function tileWidth(unit: string): number {
   const chars = Math.max(unit.length, 1);
-  return Math.max(TILE_WIDTH_MIN, TILE_WIDTH_PAD + chars * TILE_WIDTH_PER_CHAR);
+  if (chars <= 4) {
+    return Math.max(TILE_WIDTH_MIN, TILE_WIDTH_PAD + chars * TILE_WIDTH_PER_CHAR);
+  }
+  return PHRASE_WIDTH_BASE + (chars - 4) * PHRASE_WIDTH_PER_CHAR;
+}
+
+/**
+ * Dynamic font size for tile labels and ghost letters, scaled by unit character length.
+ * 1-4 chars: 58px
+ * 5-7 chars: 46px
+ * 8-12 chars: 34px
+ * >12 chars: 28px
+ */
+export function tileFontSize(unit: string): number {
+  const len = unit.length;
+  if (len <= 4) return 58;
+  if (len <= 7) return 46;
+  if (len <= 12) return 34;
+  return 28;
 }
 
 /**
@@ -759,7 +779,7 @@ export const BANDS = {
   hintY: 352,
   slotsCenterY: 444,
   slotHeight: TILE_HEIGHT,
-  trayCenterY: 604,
+  trayCenterY: 614,
   /** Bottom margin the tray must never cross. */
   safeBottom: 704,
 } as const;

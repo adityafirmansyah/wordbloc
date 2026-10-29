@@ -23,24 +23,21 @@ import {
   FONT_FAMILY,
   FRAMES,
   PORTRAIT_BANDS,
-  PORTRAIT_TRAY_MAX_WIDTH,
   SCENES,
-  SLOT_GAP,
   TILE_CORNER_SLICE,
   TILE_HEIGHT,
-  TRAY_GAP,
-  TRAY_MAX_WIDTH,
-  TRAY_ROW_GAP,
   anchorX,
   artHaloColor,
   chunkFrameFor,
   slotDoneFrameFor,
   slotFrameFor,
+  tileFontSize,
   tileFrameFor,
   tileWidth,
   withinDropZone,
   type StageMetrics,
 } from '../game/theme';
+import { computeSceneLayout } from '../game/gameLayout';
 import type { Level, Mechanic } from '../game/levelTypes';
 import { makeArtView } from '../ui/artView';
 import { makeEdgeIconButton, makeText } from '../ui/kit';
@@ -351,17 +348,17 @@ export class GameScene extends Phaser.Scene {
   private drawArt(): void {
     const isPortrait = this.layout.metrics.isPortrait;
     const cx = this.layout.metrics.centreX;
-    const bands = isPortrait ? PORTRAIT_BANDS : BANDS;
-    const { width } = bands.artSize;
+    const sceneLayout = computeSceneLayout(this.level, isPortrait, cx);
+    const { width } = sceneLayout.artSize;
     const imageKey = this.level.image;
 
     this.haloGraphics = this.add.graphics().setDepth(1);
-    this.paintHalo(cx, bands.artCenterY, bands.artHaloRadius);
+    this.paintHalo(cx, sceneLayout.artCenterY, sceneLayout.artHaloRadius);
 
     this.artInitial = this.add
-      .text(cx, bands.artCenterY, this.level.display.charAt(0).toUpperCase(), {
+      .text(cx, sceneLayout.artCenterY, this.level.display.charAt(0).toUpperCase(), {
         fontFamily: FONT_FAMILY,
-        fontSize: isPortrait ? '130px' : '88px',
+        fontSize: isPortrait ? '130px' : sceneLayout.isMultiRowLandscape ? '60px' : '88px',
         color: '#21324a',
         fontStyle: 'bold',
       })
@@ -370,7 +367,7 @@ export class GameScene extends Phaser.Scene {
 
     const { image, ready } = makeArtView(this, {
       x: cx,
-      y: bands.artCenterY,
+      y: sceneLayout.artCenterY,
       size: width,
       imageKey,
       placeholderFrame: FRAMES.card,
@@ -393,9 +390,9 @@ export class GameScene extends Phaser.Scene {
   private drawHint(): void {
     const isPortrait = this.layout.metrics.isPortrait;
     const cx = this.layout.metrics.centreX;
-    const bands = isPortrait ? PORTRAIT_BANDS : BANDS;
+    const sceneLayout = computeSceneLayout(this.level, isPortrait, cx);
     if (this.level.hint) {
-      this.hintText = makeText(this, cx, bands.hintY, this.level.hint, 28, '#54708c');
+      this.hintText = makeText(this, cx, sceneLayout.hintY, this.level.hint, 28, '#54708c');
     }
   }
 
@@ -416,73 +413,15 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /**
-   * Computes slot positions adaptively:
-   * In landscape: single centred row at BANDS.slotsCenterY.
-   * In portrait: if units <= 5, 1 row at PORTRAIT_BANDS.slotsCenterY.
-   *              if units > 5 (e.g. 8-letter words like ELEPHANT), wrap into 2 rows.
-   */
-  private computeSlotPositions(
-    isPortrait: boolean,
-    cx: number,
-  ): { x: number; y: number; width: number }[] {
-    const units = targetUnits(this.level);
-    const widths = units.map((unit) => tileWidth(unit.unit));
-
-    if (!isPortrait || units.length <= 5) {
-      const centerY = isPortrait ? PORTRAIT_BANDS.slotsCenterY : BANDS.slotsCenterY;
-      const total =
-        widths.reduce<number>((acc, w) => acc + w, 0) + SLOT_GAP * Math.max(0, units.length - 1);
-      let cursorX = cx - total / 2;
-
-      return units.map((_, index) => {
-        const width = widths[index] ?? 128;
-        const x = cursorX + width / 2;
-        cursorX += width + SLOT_GAP;
-        return { x, y: centerY, width };
-      });
-    }
-
-    // Portrait with > 5 units: wrap into 2 rows
-    const half = Math.ceil(units.length / 2);
-    const row0Widths = widths.slice(0, half);
-    const row1Widths = widths.slice(half);
-
-    const total0 =
-      row0Widths.reduce<number>((acc, w) => acc + w, 0) +
-      SLOT_GAP * Math.max(0, row0Widths.length - 1);
-    const total1 =
-      row1Widths.reduce<number>((acc, w) => acc + w, 0) +
-      SLOT_GAP * Math.max(0, row1Widths.length - 1);
-
-    const row0Y = 630;
-    const row1Y = 770;
-
-    let cursor0 = cx - total0 / 2;
-    let cursor1 = cx - total1 / 2;
-
-    return units.map((_, index) => {
-      const width = widths[index] ?? 128;
-      if (index < half) {
-        const x = cursor0 + width / 2;
-        cursor0 += width + SLOT_GAP;
-        return { x, y: row0Y, width };
-      }
-      const x = cursor1 + width / 2;
-      cursor1 += width + SLOT_GAP;
-      return { x, y: row1Y, width };
-    });
-  }
-
   private buildSlots(): void {
     const isPortrait = this.layout.metrics.isPortrait;
     const cx = this.layout.metrics.centreX;
-    const bands = isPortrait ? PORTRAIT_BANDS : BANDS;
+    const sceneLayout = computeSceneLayout(this.level, isPortrait, cx);
     const units = targetUnits(this.level);
-    const positions = this.computeSlotPositions(isPortrait, cx);
+    const positions = sceneLayout.slotPositions;
 
     units.forEach((target, index) => {
-      const pos = positions[index] ?? { x: cx, y: bands.slotsCenterY, width: 128 };
+      const pos = positions[index] ?? { x: cx, y: sceneLayout.artCenterY, width: 128 };
       const { x, y, width } = pos;
 
       const bg = this.add.nineslice(
@@ -504,7 +443,7 @@ export class GameScene extends Phaser.Scene {
         ghost = this.add
           .text(x, y - 4, target.unit, {
             fontFamily: FONT_FAMILY,
-            fontSize: '58px',
+            fontSize: `${tileFontSize(target.unit)}px`,
             color: '#b9cfe0',
             fontStyle: 'bold',
           })
@@ -529,7 +468,7 @@ export class GameScene extends Phaser.Scene {
     this.mechanicText = makeText(
       this,
       cx,
-      bands.mechanicY,
+      sceneLayout.mechanicY,
       this.mechanicLabel(this.level.mechanic),
       26,
       '#7f95ab',
@@ -538,68 +477,13 @@ export class GameScene extends Phaser.Scene {
 
   // ----------------------------------------------------------------- tray
 
-  /**
-   * Computes tray item positions adaptively:
-   * In landscape: max width 1180, centered around BANDS.trayCenterY.
-   * In portrait: max width 680 (arranging tiles into 2 rows in the thumb zone),
-   *              centered around PORTRAIT_BANDS.trayCenterY (~950–1100).
-   */
-  private computeTrayPositions(isPortrait: boolean, cx: number): { x: number; y: number }[] {
-    const items = buildTray(this.level);
-    const maxRowWidth = isPortrait ? PORTRAIT_TRAY_MAX_WIDTH : TRAY_MAX_WIDTH;
-    const trayCenterY = isPortrait ? PORTRAIT_BANDS.trayCenterY : BANDS.trayCenterY;
-    const safeBottom = isPortrait ? PORTRAIT_BANDS.safeBottom : BANDS.safeBottom;
-
-    const rows: TrayItem[][] = [];
-    let row: TrayItem[] = [];
-    let rowWidth = 0;
-    for (const item of items) {
-      const w = tileWidth(item.unit);
-      const add = row.length === 0 ? w : w + TRAY_GAP;
-      if (rowWidth + add > maxRowWidth && row.length > 0) {
-        rows.push(row);
-        row = [item];
-        rowWidth = w;
-      } else {
-        row.push(item);
-        rowWidth += add;
-      }
-    }
-    if (row.length > 0) rows.push(row);
-
-    const rowHeight = TILE_HEIGHT + TRAY_ROW_GAP;
-    const blockHeight = rows.length * rowHeight - TRAY_ROW_GAP;
-    const startY = trayCenterY - blockHeight / 2 + TILE_HEIGHT / 2;
-    const lastRowBottom = startY + (rows.length - 1) * rowHeight + TILE_HEIGHT / 2;
-    const shift = lastRowBottom > safeBottom ? lastRowBottom - safeBottom : 0;
-    const trayTop = startY - shift;
-
-    const positions: { x: number; y: number }[] = [];
-
-    rows.forEach((trayRow, rowIndex) => {
-      const widths = trayRow.map((item) => tileWidth(item.unit));
-      const total =
-        widths.reduce<number>((acc, w) => acc + w, 0) + TRAY_GAP * Math.max(0, trayRow.length - 1);
-      let cursorX = cx - total / 2;
-      const y = trayTop + rowIndex * rowHeight;
-
-      trayRow.forEach((_, i) => {
-        const width = widths[i] ?? 128;
-        const x = cursorX + width / 2;
-        positions.push({ x, y });
-        cursorX += width + TRAY_GAP;
-      });
-    });
-
-    return positions;
-  }
-
   private buildTray(): void {
     const isPortrait = this.layout.metrics.isPortrait;
     const cx = this.layout.metrics.centreX;
     const items = buildTray(this.level);
     const isChunk = this.level.mechanic !== 'letter_drag';
-    const positions = this.computeTrayPositions(isPortrait, cx);
+    const sceneLayout = computeSceneLayout(this.level, isPortrait, cx);
+    const positions = sceneLayout.trayPositions;
 
     items.forEach((item, index) => {
       const pos = positions[index] ?? { x: cx, y: BANDS.trayCenterY };
@@ -622,7 +506,7 @@ export class GameScene extends Phaser.Scene {
       const label = this.add
         .text(0, -4, item.unit, {
           fontFamily: FONT_FAMILY,
-          fontSize: '58px',
+          fontSize: `${tileFontSize(item.unit)}px`,
           color: isChunk ? '#13351b' : '#3a2a00',
           fontStyle: 'bold',
         })
@@ -831,44 +715,46 @@ export class GameScene extends Phaser.Scene {
     if (!this.level || this.slots.length === 0) return;
     const isPortrait = stage.isPortrait;
     const cx = stage.centreX;
-    const bands = isPortrait ? PORTRAIT_BANDS : BANDS;
+    const sceneLayout = computeSceneLayout(this.level, isPortrait, cx);
     const inset = isPortrait ? 80 : 92;
 
-    this.layout.setAnchorY(this.backButton, bands.headerCenterY);
-    this.layout.setAnchorY(this.soundButton, bands.headerCenterY);
+    this.layout.setAnchorY(this.backButton, sceneLayout.headerCenterY);
+    this.layout.setAnchorY(this.soundButton, sceneLayout.headerCenterY);
 
     if (this.mutedLabel) {
       this.mutedLabel.x = anchorX(stage, { kind: 'right', inset });
     }
 
     if (this.tierLabel) {
-      this.tierLabel.setPosition(cx, bands.headerCenterY - 14);
+      this.tierLabel.setPosition(cx, sceneLayout.headerCenterY - 14);
     }
     if (this.levelLabel) {
-      this.levelLabel.setPosition(cx, bands.headerCenterY + 26);
+      this.levelLabel.setPosition(cx, sceneLayout.headerCenterY + 26);
     }
 
     if (this.haloGraphics) {
-      this.paintHalo(cx, bands.artCenterY, bands.artHaloRadius);
+      this.paintHalo(cx, sceneLayout.artCenterY, sceneLayout.artHaloRadius);
     }
     if (this.artInitial) {
-      this.artInitial.setPosition(cx, bands.artCenterY);
-      this.artInitial.setFontSize(isPortrait ? '130px' : '88px');
+      this.artInitial.setPosition(cx, sceneLayout.artCenterY);
+      this.artInitial.setFontSize(
+        isPortrait ? '130px' : sceneLayout.isMultiRowLandscape ? '60px' : '88px',
+      );
     }
     if (this.artImage) {
-      this.artImage.setPosition(cx, bands.artCenterY);
-      this.artImage.setDisplaySize(bands.artSize.width, bands.artSize.height);
+      this.artImage.setPosition(cx, sceneLayout.artCenterY);
+      this.artImage.setDisplaySize(sceneLayout.artSize.width, sceneLayout.artSize.height);
     }
 
     if (this.mechanicText) {
-      this.mechanicText.setPosition(cx, bands.mechanicY);
+      this.mechanicText.setPosition(cx, sceneLayout.mechanicY);
     }
     if (this.hintText) {
-      this.hintText.setPosition(cx, bands.hintY);
+      this.hintText.setPosition(cx, sceneLayout.hintY);
     }
 
     // Reposition slots
-    const slotPositions = this.computeSlotPositions(isPortrait, cx);
+    const slotPositions = sceneLayout.slotPositions;
     this.slots.forEach((slot, index) => {
       const pos = slotPositions[index];
       if (!pos) return;
@@ -882,7 +768,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     // Reposition tray tiles
-    const trayPositions = this.computeTrayPositions(isPortrait, cx);
+    const trayPositions = sceneLayout.trayPositions;
     this.tiles.forEach((tile, index) => {
       const pos = trayPositions[index];
       if (!pos) return;
