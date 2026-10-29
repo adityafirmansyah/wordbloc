@@ -24,7 +24,7 @@ Domain: wordbloc.com (purchasing is owner-gated, NOT part of this build)
 ## Difficulty Tiers & Level Progression (Strictly Monotonic Ramping)
 
 **CRITICAL PROGRESSION LAW:**
-WordBloc difficulty MUST ramp monotonically from Level 1 to Level 100. Difficulty NEVER jumps backward (e.g. going back to 3-letter single-word spelling after level 30 is strictly forbidden). As level increases, cognitive load shifts from phonetic spelling to syntax, semantic pairing, grammatical tenses, and deductive reading comprehension. Do NOT propose, design, or implement single-word spelling regressions in levels > 30.
+WordBloc difficulty MUST ramp monotonically as levels increase, without upper limit (Level 100, 500, 1000+). Difficulty NEVER jumps backward (e.g. going back to 3-letter single-word spelling after mastering affixes and sentences is strictly forbidden). As level increases, cognitive load shifts continuously from phonetic spelling to syntax, semantic pairing, grammatical tenses, multi-sentence discourse, and deductive reading comprehension. Do NOT propose, design, or implement single-word spelling regressions in higher tiers.
 
 - **Phase 1: Foundation Words (Levels 1–30)**
   - **T1 (Levels 1–10):** 3-4 letter CVC words. Exact tile set, no distractors. Ghost letters ON. (`letter_drag`)
@@ -50,12 +50,12 @@ WordBloc difficulty MUST ramp monotonically from Level 1 to Level 100. Difficult
   - Situation indicates tomorrow ➔ `[Tomorrow,]` + `[she will visit]` + `[her grandmother]`.
   - Cognitive focus: Contextual tense inflection and temporal reasoning.
 
-- **Phase 5: Master Riddles & Deductive Comprehension (Levels 86–100)**
+- **Phase 5: Master Riddles & Deductive Comprehension (Levels 86–100+)**
   - Multi-sentence riddle / reading comprehension clue requiring deductive reasoning.
   - No direct answer pictures; visual provides ambient clue, text requires deduction.
   - Example: *"I have no legs but I run. I roar without a throat. I bring life to the desert."* ➔ `[A rushing]` + `[river]` (distractors: *A blowing wind*, *A thunderstorm*).
   - Comparative and superlative deduction: e.g. `[the fastest]` + `[animal in the world]`.
-  - Cognitive focus: Advanced reading comprehension, logical inference, and English language mastery.
+  - Open-ended scale: Further expansions (Levels 101+) continue building into advanced idioms, paragraph ordering, story sequencing, and multi-step logic without ever resetting to lower-tier mechanics.
 
 ## Phonics Rule (non-negotiable)
 When a tile is tapped/placed, speak the **phoneme** (`/k/ /æ/ /t/`), NOT the letter name
