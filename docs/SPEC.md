@@ -21,12 +21,41 @@ Domain: wordbloc.com (purchasing is owner-gated, NOT part of this build)
 4. Wrong -> tile bounces back to tray, NO buzzer, NO penalty, NO life system.
 5. Completed words persist to `localStorage` "wordbook".
 
-## Difficulty Tiers (mechanic changes, engine stays identical)
-- **T1 (Grade 1):** 3-4 letter CVC words. Exact tile set, no distractors. Ghost letters ON.
-- **T2 (Grade 2-3):** 4-6 letters. Distractor tiles added (+2..3). Ghost letters OFF.
-- **T3 (Grade 3-4):** 6-9 letters, mechanic = `syllable_tap` (chunks, not per-letter).
-- **T4 (Grade 4-5):** compound words, mechanic = `compound` (two parts merge).
-- **T5 (Grade 5-6):** prefixes/suffixes, mechanic = `affix` + sentence riddle clue.
+## Difficulty Tiers & Level Progression (Strictly Monotonic Ramping)
+
+**CRITICAL PROGRESSION LAW:**
+WordBloc difficulty MUST ramp monotonically as levels increase, without upper limit (Level 100, 500, 1000+). Difficulty NEVER jumps backward (e.g. going back to 3-letter single-word spelling after mastering affixes and sentences is strictly forbidden). As level increases, cognitive load shifts continuously from phonetic spelling to syntax, semantic pairing, grammatical tenses, multi-sentence discourse, and deductive reading comprehension. Do NOT propose, design, or implement single-word spelling regressions in higher tiers.
+
+- **Phase 1: Foundation Words (Levels 1–30)**
+  - **T1 (Levels 1–10):** 3-4 letter CVC words. Exact tile set, no distractors. Ghost letters ON. (`letter_drag`)
+  - **T2 (Levels 11–18):** 5-6 letters. Distractor tiles added (+2..3). Ghost letters OFF. (`letter_drag`)
+  - **T3 (Levels 19–24):** 6-9 letters, multi-syllable chunks with chunk distractors. (`syllable_tap`)
+  - **T4 (Levels 25–27):** Compound words fusion (two independent base words merge into one). (`compound`)
+  - **T5 (Levels 28–30):** Structural affixes (prefixes *un-, re-* and suffixes *-ful*). (`affix`)
+
+- **Phase 2: Advanced Syllabic & Lexical Complexity (Levels 31–45)**
+  - Advanced 3-4 syllable chunking & phrasal collocations / prepositional pairing.
+  - Multi-word tiles: e.g. `[a slice of]` + `[CAKE]` (distractors: *a cup of*, *a piece of*), `[switch on]` + `[THE LIGHT]`.
+  - Cognitive focus: Natural English collocations and contextual associations.
+
+- **Phase 3: Dynamic Sentence Builder & Syntax (Levels 46–65)**
+  - Full sentence syntax ordering: 4–6 multi-word / phrasal tiles.
+  - Tiles represent syntactic units: `[The monkey]` + `[is climbing]` + `[a tall tree]`.
+  - Distractors test subject-verb agreement and word order (e.g. *are climbing*, *climbs*).
+  - Cognitive focus: S-V-O-A syntactic construction and sentence comprehension.
+
+- **Phase 4: Tenses & Situational Grammar Logic (Levels 66–85)**
+  - Contextual time clues (past, present continuous, future):
+  - Example: Situation indicates yesterday ➔ `[Yesterday,]` + `[we]` + `[bought]` + `[fresh apples]` (distractors: *buy*, *buys*, *buying*).
+  - Situation indicates tomorrow ➔ `[Tomorrow,]` + `[she will visit]` + `[her grandmother]`.
+  - Cognitive focus: Contextual tense inflection and temporal reasoning.
+
+- **Phase 5: Master Riddles & Deductive Comprehension (Levels 86–100+)**
+  - Multi-sentence riddle / reading comprehension clue requiring deductive reasoning.
+  - No direct answer pictures; visual provides ambient clue, text requires deduction.
+  - Example: *"I have no legs but I run. I roar without a throat. I bring life to the desert."* ➔ `[A rushing]` + `[river]` (distractors: *A blowing wind*, *A thunderstorm*).
+  - Comparative and superlative deduction: e.g. `[the fastest]` + `[animal in the world]`.
+  - Open-ended scale: Further expansions (Levels 101+) continue building into advanced idioms, paragraph ordering, story sequencing, and multi-step logic without ever resetting to lower-tier mechanics.
 
 ## Phonics Rule (non-negotiable)
 When a tile is tapped/placed, speak the **phoneme** (`/k/ /æ/ /t/`), NOT the letter name
