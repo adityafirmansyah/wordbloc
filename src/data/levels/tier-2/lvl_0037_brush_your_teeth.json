@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0037",
+  "tier": 2,
+  "word": "BRUSH YOUR TEETH",
+  "display": "brush_your_teeth",
+  "meaning_id": "menggosok gigi",
+  "category": "home",
+  "mechanic": "compound",
+  "image": "home/brush_your_teeth",
+  "audio_word": "words/brush_your_teeth",
+  "audio_phonemes": ["phonemes/brush", "phonemes/your_teeth"],
+  "tiles": ["BRUSH", "YOUR TEETH"],
+  "distractors": ["WASH", "COMB"],
+  "chunks": ["BRUSH", "YOUR TEETH"],
+  "hint": "Clean your smile with toothpaste and a brush.",
+  "ghost_letters": false
+}

@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0039",
+  "tier": 2,
+  "word": "COMB YOUR HAIR",
+  "display": "comb_your_hair",
+  "meaning_id": "menyisir rambut",
+  "category": "home",
+  "mechanic": "compound",
+  "image": "home/comb_your_hair",
+  "audio_word": "words/comb_your_hair",
+  "audio_phonemes": ["phonemes/comb", "phonemes/your_hair"],
+  "tiles": ["COMB", "YOUR HAIR"],
+  "distractors": ["CUT", "YOUR TEETH"],
+  "chunks": ["COMB", "YOUR HAIR"],
+  "hint": "Neaten your locks before going outside.",
+  "ghost_letters": false
+}

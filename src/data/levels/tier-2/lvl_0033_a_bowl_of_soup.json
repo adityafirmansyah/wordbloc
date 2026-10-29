@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0033",
+  "tier": 2,
+  "word": "A BOWL OF SOUP",
+  "display": "a_bowl_of_soup",
+  "meaning_id": "semangkuk sup",
+  "category": "food",
+  "mechanic": "compound",
+  "image": "food/a_bowl_of_soup",
+  "audio_word": "words/a_bowl_of_soup",
+  "audio_phonemes": ["phonemes/a_bowl_of", "phonemes/soup"],
+  "tiles": ["A BOWL OF", "SOUP"],
+  "distractors": ["A GLASS OF", "TEA"],
+  "chunks": ["A BOWL OF", "SOUP"],
+  "hint": "Hot savory broth served in a bowl.",
+  "ghost_letters": false
+}

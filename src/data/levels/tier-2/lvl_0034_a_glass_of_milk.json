@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0034",
+  "tier": 2,
+  "word": "A GLASS OF MILK",
+  "display": "a_glass_of_milk",
+  "meaning_id": "segelas susu",
+  "category": "food",
+  "mechanic": "compound",
+  "image": "food/a_glass_of_milk",
+  "audio_word": "words/a_glass_of_milk",
+  "audio_phonemes": ["phonemes/a_glass_of", "phonemes/milk"],
+  "tiles": ["A GLASS OF", "MILK"],
+  "distractors": ["A CUP OF", "SOUP"],
+  "chunks": ["A GLASS OF", "MILK"],
+  "hint": "Cold fresh white milk in a tall glass.",
+  "ghost_letters": false
+}

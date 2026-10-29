@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0044",
+  "tier": 2,
+  "word": "DRIVE A CAR",
+  "display": "drive_a_car",
+  "meaning_id": "mengendarai mobil",
+  "category": "transport",
+  "mechanic": "compound",
+  "image": "transport/drive_a_car",
+  "audio_word": "words/drive_a_car",
+  "audio_phonemes": ["phonemes/drive", "phonemes/a_car"],
+  "tiles": ["DRIVE", "A CAR"],
+  "distractors": ["RIDE", "FLY"],
+  "chunks": ["DRIVE", "A CAR"],
+  "hint": "Steer a vehicle with four wheels on the road.",
+  "ghost_letters": false
+}

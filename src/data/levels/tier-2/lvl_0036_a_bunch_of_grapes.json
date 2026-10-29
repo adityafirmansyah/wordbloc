@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0036",
+  "tier": 2,
+  "word": "A BUNCH OF GRAPES",
+  "display": "a_bunch_of_grapes",
+  "meaning_id": "seikat anggur",
+  "category": "food",
+  "mechanic": "compound",
+  "image": "food/a_bunch_of_grapes",
+  "audio_word": "words/a_bunch_of_grapes",
+  "audio_phonemes": ["phonemes/a_bunch_of", "phonemes/grapes"],
+  "tiles": ["A BUNCH OF", "GRAPES"],
+  "distractors": ["A PAIR OF", "A PIECE OF"],
+  "chunks": ["A BUNCH OF", "GRAPES"],
+  "hint": "A cluster of juicy purple grapes on a stem.",
+  "ghost_letters": false
+}

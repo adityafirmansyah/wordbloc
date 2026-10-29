@@ -300,6 +300,156 @@
       "category": "feelings",
       "mechanic": "affix",
       "file": "tier-5/lvl_0030_playful.json"
+    },
+    {
+      "id": "lvl_0031",
+      "tier": 2,
+      "word": "A SLICE OF PIZZA",
+      "display": "a_slice_of_pizza",
+      "meaning_id": "sepotong pizza",
+      "category": "food",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0031_a_slice_of_pizza.json"
+    },
+    {
+      "id": "lvl_0032",
+      "tier": 2,
+      "word": "A CUP OF TEA",
+      "display": "a_cup_of_tea",
+      "meaning_id": "secangkir teh",
+      "category": "food",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0032_a_cup_of_tea.json"
+    },
+    {
+      "id": "lvl_0033",
+      "tier": 2,
+      "word": "A BOWL OF SOUP",
+      "display": "a_bowl_of_soup",
+      "meaning_id": "semangkuk sup",
+      "category": "food",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0033_a_bowl_of_soup.json"
+    },
+    {
+      "id": "lvl_0034",
+      "tier": 2,
+      "word": "A GLASS OF MILK",
+      "display": "a_glass_of_milk",
+      "meaning_id": "segelas susu",
+      "category": "food",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0034_a_glass_of_milk.json"
+    },
+    {
+      "id": "lvl_0035",
+      "tier": 2,
+      "word": "A PAIR OF SHOES",
+      "display": "a_pair_of_shoes",
+      "meaning_id": "sepasang sepatu",
+      "category": "clothes",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0035_a_pair_of_shoes.json"
+    },
+    {
+      "id": "lvl_0036",
+      "tier": 2,
+      "word": "A BUNCH OF GRAPES",
+      "display": "a_bunch_of_grapes",
+      "meaning_id": "seikat anggur",
+      "category": "food",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0036_a_bunch_of_grapes.json"
+    },
+    {
+      "id": "lvl_0037",
+      "tier": 2,
+      "word": "BRUSH YOUR TEETH",
+      "display": "brush_your_teeth",
+      "meaning_id": "menggosok gigi",
+      "category": "home",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0037_brush_your_teeth.json"
+    },
+    {
+      "id": "lvl_0038",
+      "tier": 2,
+      "word": "WASH YOUR HANDS",
+      "display": "wash_your_hands",
+      "meaning_id": "mencuci tangan",
+      "category": "home",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0038_wash_your_hands.json"
+    },
+    {
+      "id": "lvl_0039",
+      "tier": 2,
+      "word": "COMB YOUR HAIR",
+      "display": "comb_your_hair",
+      "meaning_id": "menyisir rambut",
+      "category": "home",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0039_comb_your_hair.json"
+    },
+    {
+      "id": "lvl_0040",
+      "tier": 2,
+      "word": "READ A BOOK",
+      "display": "read_a_book",
+      "meaning_id": "membaca buku",
+      "category": "school",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0040_read_a_book.json"
+    },
+    {
+      "id": "lvl_0041",
+      "tier": 2,
+      "word": "LISTEN TO MUSIC",
+      "display": "listen_to_music",
+      "meaning_id": "mendengarkan musik",
+      "category": "home",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0041_listen_to_music.json"
+    },
+    {
+      "id": "lvl_0042",
+      "tier": 2,
+      "word": "WATCH TELEVISION",
+      "display": "watch_television",
+      "meaning_id": "menonton televisi",
+      "category": "home",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0042_watch_television.json"
+    },
+    {
+      "id": "lvl_0043",
+      "tier": 2,
+      "word": "RIDE A BICYCLE",
+      "display": "ride_a_bicycle",
+      "meaning_id": "mengendarai sepeda",
+      "category": "transport",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0043_ride_a_bicycle.json"
+    },
+    {
+      "id": "lvl_0044",
+      "tier": 2,
+      "word": "DRIVE A CAR",
+      "display": "drive_a_car",
+      "meaning_id": "mengendarai mobil",
+      "category": "transport",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0044_drive_a_car.json"
+    },
+    {
+      "id": "lvl_0045",
+      "tier": 2,
+      "word": "SWITCH ON THE LIGHT",
+      "display": "switch_on_the_light",
+      "meaning_id": "menyalakan lampu",
+      "category": "home",
+      "mechanic": "compound",
+      "file": "tier-2/lvl_0045_switch_on_the_light.json"
     }
   ]
 }

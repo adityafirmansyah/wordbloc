@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0032",
+  "tier": 2,
+  "word": "A CUP OF TEA",
+  "display": "a_cup_of_tea",
+  "meaning_id": "secangkir teh",
+  "category": "food",
+  "mechanic": "compound",
+  "image": "food/a_cup_of_tea",
+  "audio_word": "words/a_cup_of_tea",
+  "audio_phonemes": ["phonemes/a_cup_of", "phonemes/tea"],
+  "tiles": ["A CUP OF", "TEA"],
+  "distractors": ["A BOWL OF", "MILK"],
+  "chunks": ["A CUP OF", "TEA"],
+  "hint": "A warm soothing drink in a cup.",
+  "ghost_letters": false
+}

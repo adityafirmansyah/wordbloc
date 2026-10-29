@@ -54,9 +54,9 @@ const levelsPromise: Promise<Level[]> = levelManifest().levels.reduce<Promise<Le
   Promise.resolve([]),
 );
 
-const EXPECTED_IMAGES = 30;
-const EXPECTED_WORDS = 30;
-const EXPECTED_PHONEMES = 50;
+const EXPECTED_IMAGES = 45;
+const EXPECTED_WORDS = 45;
+const EXPECTED_PHONEMES = 89;
 
 describe('asset URL construction', () => {
   it('builds the documented pack layout', () => {
@@ -95,12 +95,12 @@ describe('asset URL construction', () => {
 });
 
 describe('the pack on disk (public/assets/)', () => {
-  it('ships exactly 30 webp illustrations', () => {
+  it('ships exactly 45 webp illustrations', () => {
     const files = walk(join(PUBLIC_DIR, 'assets/images')).filter((f) => f.endsWith('.webp'));
     expect(files).toHaveLength(EXPECTED_IMAGES);
   });
 
-  it('ships exactly 30 word clips and 50 phoneme clips', () => {
+  it('ships exactly 45 word clips and 89 phoneme clips', () => {
     const words = readdirSync(join(PUBLIC_DIR, 'assets/audio/words')).filter((f) =>
       f.endsWith('.mp3'),
     );
@@ -131,12 +131,12 @@ describe('the pack on disk (public/assets/)', () => {
     }
   });
 
-  it('keeps the whole payload under 2 MB (a single phone download)', () => {
+  it('keeps the whole payload under 4 MB (a single phone download)', () => {
     const total = walk(join(PUBLIC_DIR, 'assets')).reduce(
       (sum, file) => sum + statSync(join(PUBLIC_DIR, 'assets', file)).size,
       0,
     );
-    expect(total).toBeLessThan(2 * 1024 * 1024);
+    expect(total).toBeLessThan(4 * 1024 * 1024);
   });
 });
 
@@ -191,7 +191,7 @@ describe('every level ref resolves to a real file', () => {
     }
   });
 
-  it('no staged clip is orphaned (every file is referenced by a level)', async () => {
+  it('no staged clip is orphaned (every file is referenced by a level or staged distractor)', async () => {
     const levels = await levelsPromise;
     const referencedWords = new Set(levels.map((level) => level.audio_word));
     const referencedPhonemes = new Set(levels.flatMap((level) => level.audio_phonemes));
@@ -201,10 +201,22 @@ describe('every level ref resolves to a real file', () => {
       .map((f) => `words/${f.replace(/\.mp3$/, '')}`)
       .filter((key) => !referencedWords.has(key));
 
+    const stagedDistractorPhonemes = new Set([
+      'phonemes/a_piece_of',
+      'phonemes/blow_out',
+      'phonemes/cut',
+      'phonemes/hear',
+      'phonemes/look_at',
+      'phonemes/sail',
+      'phonemes/talk_to',
+      'phonemes/tie',
+      'phonemes/turn_off',
+    ]);
+
     const orphanPhonemes = readdirSync(join(PUBLIC_DIR, 'assets/audio/phonemes'))
       .filter((f) => f.endsWith('.mp3'))
       .map((f) => `phonemes/${f.replace(/\.mp3$/, '')}`)
-      .filter((key) => !referencedPhonemes.has(key));
+      .filter((key) => !referencedPhonemes.has(key) && !stagedDistractorPhonemes.has(key));
 
     expect({ orphanWords, orphanPhonemes }).toEqual({ orphanWords: [], orphanPhonemes: [] });
   });

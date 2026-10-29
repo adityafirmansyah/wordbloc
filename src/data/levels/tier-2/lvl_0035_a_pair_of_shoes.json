@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0035",
+  "tier": 2,
+  "word": "A PAIR OF SHOES",
+  "display": "a_pair_of_shoes",
+  "meaning_id": "sepasang sepatu",
+  "category": "clothes",
+  "mechanic": "compound",
+  "image": "clothes/a_pair_of_shoes",
+  "audio_word": "words/a_pair_of_shoes",
+  "audio_phonemes": ["phonemes/a_pair_of", "phonemes/shoes"],
+  "tiles": ["A PAIR OF", "SHOES"],
+  "distractors": ["A BUNCH OF", "TIE"],
+  "chunks": ["A PAIR OF", "SHOES"],
+  "hint": "Two matching footwear worn on feet.",
+  "ghost_letters": false
+}
