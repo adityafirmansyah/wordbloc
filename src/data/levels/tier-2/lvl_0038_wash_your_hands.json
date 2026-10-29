@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0038",
+  "tier": 2,
+  "word": "WASH YOUR HANDS",
+  "display": "wash_your_hands",
+  "meaning_id": "mencuci tangan",
+  "category": "home",
+  "mechanic": "compound",
+  "image": "home/wash_your_hands",
+  "audio_word": "words/wash_your_hands",
+  "audio_phonemes": ["phonemes/wash", "phonemes/your_hands"],
+  "tiles": ["WASH", "YOUR HANDS"],
+  "distractors": ["BRUSH", "YOUR HAIR"],
+  "chunks": ["WASH", "YOUR HANDS"],
+  "hint": "Rinse away dirt with water and soap.",
+  "ghost_letters": false
+}

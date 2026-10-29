@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0042",
+  "tier": 2,
+  "word": "WATCH TELEVISION",
+  "display": "watch_television",
+  "meaning_id": "menonton televisi",
+  "category": "home",
+  "mechanic": "compound",
+  "image": "home/watch_television",
+  "audio_word": "words/watch_television",
+  "audio_phonemes": ["phonemes/watch", "phonemes/television"],
+  "tiles": ["WATCH", "TELEVISION"],
+  "distractors": ["LOOK AT", "READ"],
+  "chunks": ["WATCH", "TELEVISION"],
+  "hint": "Tune in to cartoons on the living room screen.",
+  "ghost_letters": false
+}

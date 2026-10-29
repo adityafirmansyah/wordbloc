@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0031",
+  "tier": 2,
+  "word": "A SLICE OF PIZZA",
+  "display": "a_slice_of_pizza",
+  "meaning_id": "sepotong pizza",
+  "category": "food",
+  "mechanic": "compound",
+  "image": "food/a_slice_of_pizza",
+  "audio_word": "words/a_slice_of_pizza",
+  "audio_phonemes": ["phonemes/a_slice_of", "phonemes/pizza"],
+  "tiles": ["A SLICE OF", "PIZZA"],
+  "distractors": ["A PIECE OF", "SOUP"],
+  "chunks": ["A SLICE OF", "PIZZA"],
+  "hint": "A tasty triangular portion of pizza.",
+  "ghost_letters": false
+}

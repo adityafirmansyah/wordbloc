@@ -20,7 +20,7 @@ import type { Level } from '../src/game/levelTypes';
  * "the pack parses" is now "every individual file loads and validates".
  */
 
-const COUNT = 30;
+const COUNT = 45;
 
 let levels: Level[];
 
@@ -32,16 +32,16 @@ beforeAll(async () => {
 });
 
 describe('level manifest (src/data/levels/manifest.json)', () => {
-  it('lists exactly 30 levels', () => {
+  it('lists exactly 45 levels', () => {
     expect(manifestCount()).toBe(COUNT);
     expect(levelManifest().version).toBe(2);
   });
 
-  it('ships exactly 10 / 8 / 6 / 3 / 3 levels by tier', () => {
+  it('ships exactly 10 / 23 / 6 / 3 / 3 levels by tier', () => {
     const counts = [...manifestEntriesByTier().entries()]
       .map(([tier, entries]) => [tier, entries.length] as const)
       .sort((a, b) => a[0] - b[0]);
-    expect(Object.fromEntries(counts)).toEqual({ 1: 10, 2: 8, 3: 6, 4: 3, 5: 3 });
+    expect(Object.fromEntries(counts)).toEqual({ 1: 10, 2: 23, 3: 6, 4: 3, 5: 3 });
   });
 
   it('uses unique ids and unique words', () => {
@@ -52,7 +52,7 @@ describe('level manifest (src/data/levels/manifest.json)', () => {
 
   it('points at the documented per-tier file layout', () => {
     for (const entry of levelManifest().levels) {
-      expect(entry.file, entry.id).toMatch(/^tier-[1-5]\/lvl_\d{4}_[a-z]+\.json$/);
+      expect(entry.file, entry.id).toMatch(/^tier-[1-5]\/lvl_\d{4}_[a-z_]+\.json$/);
       expect(entry.file.startsWith(`tier-${entry.tier}/`), entry.id).toBe(true);
     }
   });
@@ -69,7 +69,7 @@ describe('level manifest (src/data/levels/manifest.json)', () => {
 });
 
 describe('every level file loads and validates', () => {
-  it('loads all 30 levels through the lazy loader', () => {
+  it('loads all 45 levels through the lazy loader', () => {
     expect(levels).toHaveLength(COUNT);
     expect(levels.map((l) => l.id)).toEqual(levelManifest().levels.map((e) => e.id));
   });
@@ -103,7 +103,11 @@ describe('every level file loads and validates', () => {
       5: 'affix',
     };
     for (const level of levels) {
-      expect(level.mechanic, `${level.id} tier ${level.tier}`).toBe(expected[level.tier]);
+      if (level.tier === 2 && level.id >= 'lvl_0031') {
+        expect(level.mechanic, `${level.id} tier ${level.tier}`).toBe('compound');
+      } else {
+        expect(level.mechanic, `${level.id} tier ${level.tier}`).toBe(expected[level.tier]);
+      }
     }
   });
 

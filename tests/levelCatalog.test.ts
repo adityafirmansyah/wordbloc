@@ -284,9 +284,9 @@ describe('createLevelCatalog — manifest contract', () => {
 describe('real catalogue wiring', () => {
   it('the app catalogue has no missing files and a full manifest', () => {
     expect(manifestMissingFiles()).toEqual([]);
-    expect(manifestCount()).toBe(30);
-    expect(levelCatalog().manifest().levels).toHaveLength(30);
-    expect(assertLevelData().levels).toHaveLength(30);
+    expect(manifestCount()).toBe(45);
+    expect(levelCatalog().manifest().levels).toHaveLength(45);
+    expect(assertLevelData().levels).toHaveLength(45);
   });
 
   it('assertCatalogData fails loudly when a file is missing', () => {

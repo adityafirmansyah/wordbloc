@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0040",
+  "tier": 2,
+  "word": "READ A BOOK",
+  "display": "read_a_book",
+  "meaning_id": "membaca buku",
+  "category": "school",
+  "mechanic": "compound",
+  "image": "school/read_a_book",
+  "audio_word": "words/read_a_book",
+  "audio_phonemes": ["phonemes/read", "phonemes/a_book"],
+  "tiles": ["READ", "A BOOK"],
+  "distractors": ["LOOK AT", "WRITE"],
+  "chunks": ["READ", "A BOOK"],
+  "hint": "Turn the pages to enjoy a wonderful tale.",
+  "ghost_letters": false
+}

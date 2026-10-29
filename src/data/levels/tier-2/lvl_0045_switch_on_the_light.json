@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0045",
+  "tier": 2,
+  "word": "SWITCH ON THE LIGHT",
+  "display": "switch_on_the_light",
+  "meaning_id": "menyalakan lampu",
+  "category": "home",
+  "mechanic": "compound",
+  "image": "home/switch_on_the_light",
+  "audio_word": "words/switch_on_the_light",
+  "audio_phonemes": ["phonemes/switch_on", "phonemes/the_light"],
+  "tiles": ["SWITCH ON", "THE LIGHT"],
+  "distractors": ["TURN OFF", "BLOW OUT"],
+  "chunks": ["SWITCH ON", "THE LIGHT"],
+  "hint": "Press the switch so the room lights up.",
+  "ghost_letters": false
+}

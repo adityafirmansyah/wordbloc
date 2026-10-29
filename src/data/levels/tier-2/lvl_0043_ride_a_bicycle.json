@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0043",
+  "tier": 2,
+  "word": "RIDE A BICYCLE",
+  "display": "ride_a_bicycle",
+  "meaning_id": "mengendarai sepeda",
+  "category": "transport",
+  "mechanic": "compound",
+  "image": "transport/ride_a_bicycle",
+  "audio_word": "words/ride_a_bicycle",
+  "audio_phonemes": ["phonemes/ride", "phonemes/a_bicycle"],
+  "tiles": ["RIDE", "A BICYCLE"],
+  "distractors": ["DRIVE", "SAIL"],
+  "chunks": ["RIDE", "A BICYCLE"],
+  "hint": "Pedal on two wheels along the path.",
+  "ghost_letters": false
+}

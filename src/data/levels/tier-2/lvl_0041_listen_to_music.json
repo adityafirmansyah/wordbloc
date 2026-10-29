@@ -1,0 +1,17 @@
+{
+  "id": "lvl_0041",
+  "tier": 2,
+  "word": "LISTEN TO MUSIC",
+  "display": "listen_to_music",
+  "meaning_id": "mendengarkan musik",
+  "category": "home",
+  "mechanic": "compound",
+  "image": "home/listen_to_music",
+  "audio_word": "words/listen_to_music",
+  "audio_phonemes": ["phonemes/listen_to", "phonemes/music"],
+  "tiles": ["LISTEN TO", "MUSIC"],
+  "distractors": ["TALK TO", "HEAR"],
+  "chunks": ["LISTEN TO", "MUSIC"],
+  "hint": "Put on headphones and enjoy the melody.",
+  "ghost_letters": false
+}
