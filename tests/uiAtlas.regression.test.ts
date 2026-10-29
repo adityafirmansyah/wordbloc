@@ -54,7 +54,8 @@ vi.mock('phaser', () => {
   };
 });
 
-const { ATLAS_PADDING, buildFrameSpecs, packFrames } = await import('../src/game/uiAtlas');
+const { ATLAS_PADDING, buildFrameSpecs, makeSlotFrameSpec, makeTileFrameSpec, packFrames } =
+  await import('../src/game/uiAtlas');
 const { BUTTON_SIZE } = await import('../src/game/theme');
 
 type Specs = ReturnType<typeof buildFrameSpecs>;
@@ -244,7 +245,7 @@ describe('atlas frames draw only inside their own frame rectangle', () => {
 
   it('covers every frame family the game addresses by name', () => {
     const names = specs.map((s) => s.name);
-    for (const expected of ['tile_w1', 'chunk_w6', 'slot_w3', 'slot_done_w3', 'btn', 'btn_down']) {
+    for (const expected of ['tile', 'chunk', 'slot', 'slot_done', 'btn', 'btn_down']) {
       expect(names, expected).toContain(expected);
     }
     for (const expected of ['btn_alt', 'btn_alt_down', 'btn_sq', 'btn_sq_down', 'panel', 'card']) {
@@ -252,8 +253,51 @@ describe('atlas frames draw only inside their own frame rectangle', () => {
     }
   });
 
+  it('provides the 4 clean NineSlice base frames at 128x144', () => {
+    for (const base of ['tile', 'chunk', 'slot', 'slot_done']) {
+      const spec = specs.find((s) => s.name === base);
+      expect(spec, `base frame ${base} must be defined in atlas`).toBeDefined();
+      expect(spec?.width).toBe(128);
+      expect(spec?.height).toBe(144);
+    }
+  });
+
   it.each(buildFrameSpecs().map((spec) => [spec.name, spec] as const))(
     '%s stays within [0..width] x [0..height]',
+    (_name, spec) => {
+      const ink = measureSpec(spec);
+      expect(ink.bounds.maxX).toBeLessThanOrEqual(spec.width + EPS);
+      expect(ink.bounds.maxY).toBeLessThanOrEqual(spec.height + EPS);
+      expect(ink.bounds.minX).toBeGreaterThanOrEqual(-EPS);
+      expect(ink.bounds.minY).toBeGreaterThanOrEqual(-EPS);
+    },
+  );
+
+  // Test legacy bucketed specs for backwards compatibility
+  const legacySpecs = [1, 2, 3, 4, 5, 6].flatMap((bucket) => {
+    const w = 60 + bucket * 34;
+    return [
+      makeTileFrameSpec(
+        'tile',
+        w,
+        144,
+        { face: 0xffd166, edge: 0xe09f3e, shine: 0xffe29a },
+        bucket,
+      ),
+      makeTileFrameSpec(
+        'chunk',
+        w,
+        144,
+        { face: 0x06d6a0, edge: 0x059669, shine: 0x6ee7b7 },
+        bucket,
+      ),
+      makeSlotFrameSpec('slot', w, 144, false, bucket),
+      makeSlotFrameSpec('slot_done', w, 144, true, bucket),
+    ];
+  });
+
+  it.each(legacySpecs.map((spec) => [spec.name, spec] as const))(
+    'legacy spec %s stays within bounds',
     (_name, spec) => {
       const ink = measureSpec(spec);
       expect(ink.bounds.maxX).toBeLessThanOrEqual(spec.width + EPS);
@@ -310,7 +354,9 @@ describe('button frames (the clipped bottom shadow)', () => {
 });
 
 describe('tile frames (the top-left bleed)', () => {
-  const tileSpecs = buildFrameSpecs().filter((spec) => spec.name.startsWith('tile_w'));
+  const tileSpecs = buildFrameSpecs().filter(
+    (spec) => spec.name === 'tile' || spec.name === 'chunk',
+  );
 
   it.each(tileSpecs.map((spec) => [spec.name, spec] as const))(
     '%s keeps body and right/down shadow inside the frame',
@@ -365,6 +411,12 @@ describe('atlas packing gutters', () => {
     const packed = packFrames(specs, 2048, ATLAS_PADDING);
     expect(packed.placements.size).toBe(specs.length);
     expect(packed.width).toBeLessThanOrEqual(2048);
+  });
+
+  it('shrinks the packed atlas height from 1808px down to ~1200px (<= 1500px)', () => {
+    const packed = packFrames(specs, 2048, ATLAS_PADDING);
+    expect(packed.height).toBeLessThan(1808);
+    expect(packed.height).toBeLessThanOrEqual(1488);
   });
 });
 
@@ -423,7 +475,7 @@ describe('canary: the pre-fix formulas violated the frame bounds', () => {
         const spec = specs.find((s) => s.name === name);
         if (!spec) continue;
         const ink = measure((g) => {
-          if (!oldDraw || !spec.name.startsWith('tile_w')) {
+          if (!oldDraw || spec.name !== 'tile') {
             spec.draw(g as unknown as Phaser.GameObjects.Graphics, spec.width, spec.height);
             return;
           }
