@@ -25,6 +25,7 @@ import {
   slotDoneFrameFor,
   slotFrameFor,
   stageMetrics,
+  tileFontSize,
   tileFrameFor,
   tileWidth,
   viewportFit,
@@ -148,11 +149,29 @@ describe('tile sizing', () => {
     expect(phrase16).toBeGreaterThan(phrase10);
     expect(phrase20).toBeGreaterThan(phrase16);
 
-    // Exact formula check: 60 + chars * 34
-    expect(phrase9).toBe(60 + 9 * 34); // 366
-    expect(phrase10).toBe(60 + 10 * 34); // 400
-    expect(phrase16).toBe(60 + 16 * 34); // 604
-    expect(phrase20).toBe(60 + 20 * 34); // 740
+    // Exact formula check: proportional width for phrase units (~240-260px for 10-char phrases)
+    expect(phrase6).toBe(216);
+    expect(phrase9).toBe(246);
+    expect(phrase10).toBe(256);
+    expect(phrase16).toBe(316);
+    expect(phrase20).toBe(356);
+  });
+
+  it('scales tile font size dynamically by unit length', () => {
+    // 1-4 chars: 56px - 58px
+    expect(tileFontSize('A')).toBe(58);
+    expect(tileFontSize('CAT')).toBe(58);
+    expect(tileFontSize('FISH')).toBe(58);
+    // 5-7 chars: 44px - 48px
+    expect(tileFontSize('PIZZA')).toBe(46);
+    expect(tileFontSize('SWITCH')).toBe(46);
+    expect(tileFontSize('FLOWERS')).toBe(46);
+    // 8-12 chars: 32px - 36px
+    expect(tileFontSize('A CUP OF')).toBe(34);
+    expect(tileFontSize('A SLICE OF')).toBe(34);
+    expect(tileFontSize('TELEVISION')).toBe(34);
+    // >12 chars: 26px - 28px
+    expect(tileFontSize('BRUSH YOUR TEETH')).toBe(28);
   });
 
   it('guarantees monotonic non-decreasing widths for phrase growth', () => {
